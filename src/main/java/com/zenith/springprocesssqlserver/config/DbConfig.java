@@ -1,11 +1,7 @@
 package com.zenith.springprocesssqlserver.config;
 
-import cn.hutool.core.util.StrUtil;
-import com.jfinal.kit.PropKit;
 import com.jfinal.plugin.activerecord.ActiveRecordPlugin;
 import com.jfinal.plugin.activerecord.CaseInsensitiveContainerFactory;
-import com.jfinal.plugin.activerecord.Db;
-import com.jfinal.plugin.activerecord.Record;
 import com.jfinal.plugin.activerecord.dialect.PostgreSqlDialect;
 import com.jfinal.plugin.activerecord.dialect.SqlServerDialect;
 import com.jfinal.plugin.druid.DruidPlugin;
@@ -33,7 +29,6 @@ public class DbConfig {
     @Value("${jfinal.sqlserver.datasource.password}")
     private String password;
 
-
     @Value("${jfinal.datasource.url}")
     private String pgUrl;
 
@@ -47,22 +42,22 @@ public class DbConfig {
     private String pgPassword;
 
 
-    @Bean
-    public ActiveRecordPlugin initActiveRecirdPlugin(){
-        //sqlserver数据库
-        DruidPlugin druidPlugin = new DruidPlugin(/*"jdbc:sqlserver://23.8.15.49:1433;Database=区县02涪陵区"*/url, username, password.trim());
-        druidPlugin.setDriverClass(driverClass); //Users是你的数据库中的某一个表
-        // 配置ActiveRecord插件
-        ActiveRecordPlugin arp = new ActiveRecordPlugin(DBConstant.SQLSERVER,druidPlugin);
-        // 配置Sqlserver方言
-        arp.setDialect(new SqlServerDialect());
-        arp.setShowSql(true);
-        // 配置属性名(字段名)大小写不敏感容器工厂
-        arp.setContainerFactory(new CaseInsensitiveContainerFactory());
-        druidPlugin.start();
-        arp.start();
-        return arp;
-    }
+//    @Bean
+//    public ActiveRecordPlugin initActiveRecirdPlugin(){
+//        //sqlserver数据库
+//        DruidPlugin druidPlugin = new DruidPlugin(/*"jdbc:sqlserver://23.130.10.202:1433;Database=区县02涪陵区"*/url, username, password.trim());
+//        druidPlugin.setDriverClass(driverClass); //Users是你的数据库中的某一个表
+//        // 配置ActiveRecord插件
+//        ActiveRecordPlugin arp = new ActiveRecordPlugin(DBConstant.SQLSERVER,druidPlugin);
+//        // 配置Sqlserver方言
+//        arp.setDialect(new SqlServerDialect());
+//        arp.setShowSql(true);
+//        // 配置属性名(字段名)大小写不敏感容器工厂
+//        arp.setContainerFactory(new CaseInsensitiveContainerFactory());
+//        druidPlugin.start();
+//        arp.start();
+//        return arp;
+//    }
 
     @Bean
     public ActiveRecordPlugin initPGActiveRecirdPlugin(){
@@ -80,5 +75,6 @@ public class DbConfig {
         arp.start();
         return arp;
     }
+
 
 }

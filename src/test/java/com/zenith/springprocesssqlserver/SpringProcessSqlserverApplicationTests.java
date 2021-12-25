@@ -4,6 +4,7 @@ import com.zenith.springprocesssqlserver.gbservice.A0000Dto;
 import com.zenith.springprocesssqlserver.gbservice.BatchUpdateMem;
 import com.zenith.springprocesssqlserver.gbservice.InMessage;
 import com.zenith.springprocesssqlserver.gbservice.MemService;
+import com.zenith.springprocesssqlserver.sync.service.StrDateFormatUtil;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -29,6 +30,12 @@ class SpringProcessSqlserverApplicationTests {
         batchUpdateMem.setMems(param);
         batchUpdateMemInMessage.setData(batchUpdateMem);
         memService.batchSyncMem(batchUpdateMemInMessage);
+    }
+
+    @Test
+    public void test(){
+        String dateFormat = StrDateFormatUtil.getDateFormat("2019/11/21");
+        System.out.println(dateFormat);
     }
 
 }

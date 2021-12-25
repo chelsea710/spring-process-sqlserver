@@ -21,6 +21,7 @@ import java.util.stream.Collectors;
  */
 @Service
 public class SyncA02Service {
+
     @Autowired
     private SyncDao syncDao;
 

@@ -1,7 +1,5 @@
 package com.zenith.springprocesssqlserver.sync.service;
 
-import cn.hutool.core.collection.CollectionUtil;
-import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
 import com.jfinal.kit.StrKit;
 import com.jfinal.plugin.activerecord.Db;

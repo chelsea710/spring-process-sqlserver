@@ -1,10 +1,14 @@
 package com.zenith.springprocesssqlserver.sync.service;
 
+import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.collection.CollectionUtil;
 import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.IoUtil;
+import cn.hutool.core.text.StrBuilder;
+import cn.hutool.core.util.IdcardUtil;
 import cn.hutool.core.util.ObjectUtil;
+import cn.hutool.core.util.ReUtil;
 import cn.hutool.core.util.StrUtil;
 import com.jfinal.kit.StrKit;
 import com.jfinal.plugin.activerecord.Db;
@@ -14,6 +18,13 @@ import com.jfinal.plugin.activerecord.Record;
 import com.zenith.springprocesssqlserver.config.Exce;
 import com.zenith.springprocesssqlserver.constant.DBConstant;
 import com.zenith.springprocesssqlserver.sync.dao.SyncDao;
+import org.apache.poi.hssf.usermodel.HSSFCell;
+import org.apache.poi.hssf.usermodel.HSSFDateUtil;
+import org.apache.poi.ss.usermodel.CellType;
+import org.apache.poi.xssf.usermodel.XSSFCell;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -21,10 +32,13 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
 import static com.zenith.springprocesssqlserver.constant.DBConstant.PG;
+import static com.zenith.springprocesssqlserver.constant.DBConstant.SQLSERVER;
 
 
 /**
@@ -1122,70 +1136,54 @@ public class SyncService {
     }
 
 
-    public void processPng() throws Exception{
-        Set<String> a01Records = syncDao.findPgCityAnfCompanyMem();
-        List<Record> saveA01Record = new ArrayList<>();
-        Integer pageNum = 1;
-        while (true) {
-            Page<Record> sqlServerPhoto = syncDao.findSqlServerPhoto(pageNum,1000);
-            if(sqlServerPhoto.getList().size()!=0) {
-                for (Record record : sqlServerPhoto.getList()) {
-                    byte[] aphoto01s = record.getBytes("aphoto01");
-                    if (ObjectUtil.isNotNull(aphoto01s) && aphoto01s.length > 0) {
-                        String fileType = this.checkType(this.bytesToHexString(aphoto01s));
-                        String leader_code = record.getStr("leader_code");
-                        if(!StrUtil.equalsAny(fileType,".jpg","0000") && a01Records.contains(leader_code)) {
-                            ByteArrayInputStream byteArrayInputStream = IoUtil.toStream(aphoto01s);
-                            File file = new File("/home/photos/" + leader_code +fileType);
-                            FileOutputStream fileOutputStream = new FileOutputStream(file);
-                            IoUtil.copy(byteArrayInputStream, fileOutputStream);
-                            byteArrayInputStream.close();
-                            fileOutputStream.close();
 
-                            Record a01 = new Record();
-                            a01.set("A0000",leader_code);
-                            a01.set("A0198","/upload/impFile/Photos/"+leader_code + fileType);
-                            saveA01Record.add(a01);
+
+
+    public void processPng() throws Exception {
+        //查询出需要替换照片的人员信息
+        List<Record> sqlStr = Db.use(PG).find("select \"A0000\",\"gwyA0000\" from \"A01_lqxth\" where \"gwyA0000\" in (select \"A0000\" from \"a01\")");
+        List<Record> recordList = Db.use(PG).find("select \"A0000\" from \"A01_lqxth_add\" ");
+
+        List<String> a0000 = sqlStr.stream().map(var -> "'"+ var.getStr("A0000")+"'").collect(Collectors.toList());
+        List<String> a00001 = recordList.stream().map(var -> "'"+var.getStr("A0000")+"'").collect(Collectors.toList());
+        a0000.addAll(a00001);
+
+        Map<String, String> updateMap = sqlStr.stream().collect(Collectors.toMap(key -> key.getStr("A0000"), value -> value.getStr("gwyA0000"), (key1, key2) -> key1));
+        Set<String> insertSet = recordList.stream().map(var -> var.getStr("A0000")).collect(Collectors.toSet());
+
+        List<Record> sqlServerPhoto = Db.use(SQLSERVER).find("select A0198,A0000 from [dbo].[A01] where A0000 in (" + CollectionUtil.join(a0000, ",") + ")");
+
+        List<String> updateSql =new ArrayList();
+        if (sqlServerPhoto.size() != 0) {
+            for (Record record : sqlServerPhoto) {
+                byte[] aphoto01s = record.getBytes("A0198");
+                String a00002 = record.getStr("A0000");
+                if (ObjectUtil.isNotNull(aphoto01s) && aphoto01s.length > 0) {
+                    String fileType = this.checkType(this.bytesToHexString(aphoto01s));
+                    ByteArrayInputStream byteArrayInputStream = IoUtil.toStream(aphoto01s);
+                    String fileTypeFix = "viewDetails" +a00002 + fileType;
+                    File file = new File("/home/gb1809_2/webapp/photo/"+fileTypeFix);
+                    FileOutputStream fileOutputStream = new FileOutputStream(file);
+                    IoUtil.copy(byteArrayInputStream, fileOutputStream);
+                    byteArrayInputStream.close();
+                    fileOutputStream.close();
+                    if(updateMap.containsKey(a00002)){
+                        updateSql.add("update \"a01\" set \"A0198\" = '/upload/impFile/Photos/"+fileTypeFix+"' where \"A0000\" = '"+updateMap.get(a00002)+"';");
+                    } else {
+                        if(insertSet.contains(a00002)){
+                            updateSql.add("update \"a01\" set \"A0198\" = '/upload/impFile/Photos/"+fileTypeFix+"' where \"A0000\" = '"+a00002+"';");
                         }
                     }
                 }
-                pageNum++;
-            }else {
-                break;
             }
         }
-
-        if(saveA01Record.size() > 0){
-            Db.use(PG).tx(()->{
-                Db.use(PG).batchSave("fulingPic",saveA01Record,1000);
-                return true;
-            });
+        if(CollectionUtil.isNotEmpty(updateSql)){
+            FileOutputStream fileOutputStream = new FileOutputStream(new File("/home/gb1809_2/webapp/photoSql.txt"));
+            IoUtil.write(fileOutputStream,true,CollectionUtil.join(updateSql,"\n").getBytes(StandardCharsets.UTF_8));
         }
+        System.out.println("运行完了");
+
     }
-
-
-    public void setRecordAphoto(Record record,Record saveA01Record) {
-        try {
-            byte[] aphoto01s = record.getBytes("aphoto01");
-            if (ObjectUtil.isNotNull(aphoto01s) && aphoto01s.length > 0) {
-                String fileType = this.checkType(this.bytesToHexString(aphoto01s));
-                String leader_code = record.getStr("leader_code");
-                ByteArrayInputStream byteArrayInputStream = IoUtil.toStream(aphoto01s);
-                //地址需要我们专门设置
-                File file = new File("/home/photos/" + leader_code + fileType);
-                FileOutputStream fileOutputStream = new FileOutputStream(file);
-                IoUtil.copy(byteArrayInputStream, fileOutputStream);
-                byteArrayInputStream.close();
-                fileOutputStream.close();
-
-                saveA01Record.set("A0000", leader_code);
-                saveA01Record.set("A0198", "/upload/impFile/Photos/" + leader_code + DateUtil.format(new Date(),"yyyy-MM-dd HH:mm:ssSSS") + fileType);
-            }
-        }catch (Exception e){
-            e.printStackTrace();
-        }
-    }
-
 
     public  String bytesToHexString(byte[] src) {
         StringBuilder stringBuilder = new StringBuilder();
@@ -1234,8 +1232,39 @@ public class SyncService {
             return ".tif";
         }
 
+        if(StrUtil.isNotEmpty(xxxx) && xxxx.length() >= 4 && StrUtil.equalsIgnoreCase(xxxx.substring(0,4),"424d")){
+            return ".bmp";
+        }
+
         return "0000";
     }
+
+
+
+    public void setRecordAphoto(Record record,Record saveA01Record) {
+        try {
+            byte[] aphoto01s = record.getBytes("aphoto01");
+            if (ObjectUtil.isNotNull(aphoto01s) && aphoto01s.length > 0) {
+                String fileType = this.checkType(this.bytesToHexString(aphoto01s));
+                String leader_code = record.getStr("leader_code");
+                ByteArrayInputStream byteArrayInputStream = IoUtil.toStream(aphoto01s);
+                //地址需要我们专门设置
+                File file = new File("/home/photos/" + leader_code + fileType);
+                FileOutputStream fileOutputStream = new FileOutputStream(file);
+                IoUtil.copy(byteArrayInputStream, fileOutputStream);
+                byteArrayInputStream.close();
+                fileOutputStream.close();
+
+                saveA01Record.set("A0000", leader_code);
+                saveA01Record.set("A0198", "/upload/impFile/Photos/" + leader_code + DateUtil.format(new Date(),"yyyy-MM-dd HH:mm:ssSSS") + fileType);
+            }
+        }catch (Exception e){
+            e.printStackTrace();
+        }
+    }
+
+
+
 
 
     /**
@@ -1408,6 +1437,488 @@ public class SyncService {
         });
     }
 
+
+
+    //导入村社区的信息
+    public void loadCommuit() throws Exception{
+        String orgIdin = CollectionUtil.join(Db.use(PG).find("select * from \"villageOrgTreeConfig\"").stream().map(var -> "'" + var.getStr("orgId") + "'").collect(Collectors.toList()), ",");
+        List<String> b0111Parent = Db.use(PG).find("select \"B0111\" from \"b01\" where \"id\" in (" + orgIdin + ")").stream().map(var-> " \"b01\".\"B0111\" like '" + var.getStr("B0111") + "____' ").collect(Collectors.toList());
+
+
+        //key 街道名称 value 街道id
+        Map<String,String> orgParentMap = Db.use(PG).find("select \"id\",\"B0104\" from \"b01\" where ("+CollectionUtil.join(b0111Parent,"or")+") and \"isDelete\" = 0 ").stream().collect(Collectors.toMap(key->key.getStr("B0104"),value->value.getStr("id"),(key1,key2)->key1));
+
+        //村社区 map
+        Map<String,List<Record>> orgMap = Db.use(PG).find("select * from \"b01\" where \"system\" = '18' and \"isDelete\" = 0 order by \"orgTreeSort\"").stream().collect(Collectors.groupingBy(var->var.getStr("B0104"),LinkedHashMap::new,Collectors.toList()));
+
+        List<Record> saveRecordList = new ArrayList<>();
+
+        //读取文件
+        File file = new File("/home/findPicFuling/1.xlsx");
+//        File file = new File("F:\\1.xlsx");
+        FileInputStream fileInputStream = new FileInputStream(file);
+        XSSFWorkbook xssfWorkbook = new XSSFWorkbook(fileInputStream);
+        XSSFSheet sheetAt = xssfWorkbook.getSheetAt(0);
+        for(int index= 3;index<sheetAt.getLastRowNum();index++){
+            XSSFRow row = sheetAt.getRow(index);
+            if(ObjectUtil.isNotNull(row.getCell(1)) && StrUtil.isNotEmpty(row.getCell(1).getStringCellValue())) {
+                Record record = new Record();
+                record.set("id", StrKit.getRandomUUID().toUpperCase());
+                record.set("status","1");
+                //街道名称
+                String orgParentName = row.getCell(1).getStringCellValue().replaceAll(" ", "");
+                if (orgParentMap.containsKey(orgParentName)) {
+                    record.set("jobParentUnit", orgParentMap.get(orgParentName));
+                }
+
+                //村社区名称
+                String orgName = row.getCell(3).getStringCellValue();
+                if (StrUtil.equals(orgName, "青龙村")) {
+                    if (StrUtil.equals(orgParentName, "清溪镇")) {
+                        record.set("jobUnit", "48E9357E7BA4438A84C2C9CA684BB139");
+                    } else {
+                        record.set("jobUnit", "49D42422CB8141FCBDDE6FF5E55D9FE9");
+                    }
+                } else {
+                    try {
+                        record.set("jobUnit", orgMap.get(orgName.replaceAll(" ","")).get(0).getStr("id"));
+                    }catch (Exception e){
+                        System.out.println("错误:"+orgName);
+                    }
+                }
+
+                //姓名
+                String name = row.getCell(4).getStringCellValue();
+                record.set("name", name);
+
+                //性别
+                String gender = row.getCell(5).getStringCellValue();
+                record.set("gender", StrUtil.equals(gender, "男") ? "1" : "2");
+
+                //出生日期与身份证号
+                String idCard = row.getCell(7).getStringCellValue();
+                record.set("idCard", idCard);
+                String birthByIdCard = IdcardUtil.getBirthByIdCard(idCard);
+                record.set("birthday", DateUtil.parse(birthByIdCard, "yyyyMMdd"));
+
+                //正职面貌
+                String political = row.getCell(8).getStringCellValue();
+                record.set("political", null);
+                if (StrUtil.isNotEmpty(political)) {
+                    political = political.replaceAll(" ", "");
+                    if (StrUtil.equalsAny(political, "党员", "中共党员")) {
+                        record.set("political", "01");
+                    }
+                    if (StrUtil.equalsAny(political, "预备党员", "中共预备党员")) {
+                        record.set("political", "02");
+                    }
+                    if (StrUtil.equalsAny(political, "共青团员", "团员")) {
+                        record.set("political", "03");
+                    }
+                    if (StrUtil.equalsAny(political, "群众")) {
+                        record.set("political", "13");
+                    }
+                }
+
+                //入党时间
+                XSSFCell cell1 = row.getCell(9);
+                record.set("joinThePartTime", null);
+                if(ObjectUtil.isNotNull(cell1)){
+                    String joinThePartTimeStr = cell1.getStringCellValue();
+                    if(StrUtil.isNotEmpty(joinThePartTimeStr)){
+                        if (StrUtil.isNotEmpty(joinThePartTimeStr) && !StrUtil.containsAny(joinThePartTimeStr, "1900")) {
+                            if (StrUtil.containsAny(joinThePartTimeStr, ".", "年", "-","/")) {
+                                record.set("joinThePartTime", DateUtil.parse(joinThePartTimeStr, StrDateFormatUtil.getDateFormat(joinThePartTimeStr)));
+                            } else {
+                                try {
+                                    record.set("joinThePartTime", DateUtil.parse(joinThePartTimeStr, "yyyyMMdd"));
+                                }catch (Exception e){
+                                    System.out.println("错误:"+joinThePartTimeStr);
+                                }
+                            }
+                        }
+                    }
+                }
+
+
+
+
+                //转正时间
+                XSSFCell cell = row.getCell(10);
+                record.set("turnaroundTime", null);
+                if(ObjectUtil.isNotNull(cell)) {
+                    String turnaroundTime = cell.getStringCellValue();
+                    if(StrUtil.isNotEmpty(turnaroundTime)) {
+                        if (StrUtil.isNotEmpty(turnaroundTime) && !StrUtil.containsAny(turnaroundTime, "1900")) {
+                            if (StrUtil.containsAny(turnaroundTime, ".", "年", "-","/")) {
+                                record.set("turnaroundTime", DateUtil.parse(turnaroundTime, StrDateFormatUtil.getDateFormat(turnaroundTime)));
+                            } else {
+                                try {
+                                    record.set("turnaroundTime", DateUtil.parse(turnaroundTime, "yyyyMMdd"));
+                                }catch (Exception e){
+                                    System.out.println("错误:"+turnaroundTime);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                //学历
+                String education = row.getCell(11).getStringCellValue();
+                record.set("education", education);
+                if (StrUtil.isNotEmpty(education)) {
+                    if (StrUtil.equalsAny(education, "本科", "大学", "大学本科及以上", "大学本科及以上学历")) {
+                        record.set("education", "21");
+                    }
+                    if (StrUtil.equalsAny(education, "大学专科", "大专", "大专学历", "专科")) {
+                        record.set("education", "31");
+                    }
+                    if (StrUtil.containsAny(education, "中专")) {
+                        record.set("education", "41");
+                    }
+                    if (StrUtil.containsAny(education, "高中")) {
+                        record.set("education", "61");
+                    }
+                    if (StrUtil.containsAny(education, "初中")) {
+                        record.set("education", "71");
+                    }
+                }
+
+                //专业
+                String specialty = row.getCell(12).getStringCellValue();
+                record.set("specialty", StrUtil.isNotEmpty(specialty) ? specialty : null);
+
+                //是否一肩挑
+                String isPartTime = row.getCell(13).getStringCellValue();
+                record.set("isPartTime", null);
+                if (StrUtil.containsAny(isPartTime, "是")) {
+                    record.set("isPartTime", "1");
+                }
+                if (StrUtil.containsAny(isPartTime, "否")) {
+                    record.set("isPartTime", "0");
+                }
+
+                //党内职务
+                String partJob = row.getCell(14).getStringCellValue();
+                record.set("partJob", null);
+                if (StrUtil.containsAny(partJob, "党组织书记")) {
+                    record.set("partJob", "1");
+                }
+                if (StrUtil.containsAny(partJob, "党组织副书记")) {
+                    record.set("partJob", "2");
+                }
+                if (StrUtil.containsAny(partJob, "党组织委员")) {
+                    record.set("partJob", "3");
+                }
+
+                //行政职务
+                String executivePositions = row.getCell(15).getStringCellValue();
+                record.set("executivePositions", null);
+                if (StrUtil.containsAny(executivePositions, "主任") && !StrUtil.containsAny(executivePositions, "副主任")) {
+                    record.set("executivePositions", "1");
+                }
+                if (StrUtil.containsAny(executivePositions, "副主任")) {
+                    record.set("executivePositions", "2");
+                }
+                if (StrUtil.containsAny(executivePositions, "委员")) {
+                    record.set("executivePositions", "3");
+                }
+
+                //兼任职务
+                record.set("partTimePositions", null);
+                String partTimePositionsOne = row.getCell(16).getStringCellValue();
+                String partTimePositionsTwo = row.getCell(17).getStringCellValue();
+                Set<String> partTimePositionsSet = new LinkedHashSet<>();
+                if (StrUtil.containsAny(partTimePositionsOne, "服务专干")) {
+                    partTimePositionsSet.add("1");
+                }
+                if (StrUtil.containsAny(partTimePositionsTwo, "服务专干")) {
+                    partTimePositionsSet.add("1");
+                }
+                if (StrUtil.containsAny(partTimePositionsOne, "治理专干")) {
+                    partTimePositionsSet.add("2");
+                }
+                if (StrUtil.containsAny(partTimePositionsTwo, "治理专干")) {
+                    partTimePositionsSet.add("2");
+                }
+                if (StrUtil.containsAny(partTimePositionsOne, "连长")) {
+                    partTimePositionsSet.add("3");
+                }
+                if (StrUtil.containsAny(partTimePositionsTwo, "连长")) {
+                    partTimePositionsSet.add("3");
+                }
+                if (StrUtil.containsAny(partTimePositionsOne, "支部")) {
+                    partTimePositionsSet.add("4");
+                }
+                if (StrUtil.containsAny(partTimePositionsTwo, "支部")) {
+                    partTimePositionsSet.add("4");
+                }
+                if (StrUtil.containsAny(partTimePositionsOne, "妇联")) {
+                    partTimePositionsSet.add("5");
+                }
+                if (StrUtil.containsAny(partTimePositionsTwo, "妇联")) {
+                    partTimePositionsSet.add("5");
+                }
+                if(CollectionUtil.isNotEmpty(partTimePositionsSet)){
+                    record.set("partTimePositions",CollectionUtil.join(partTimePositionsSet,","));
+                }
+
+                //是否在村挂职人才
+                String isHangOut = row.getCell(18).getStringCellValue();
+                record.set("isHangOut", null);
+                if (StrUtil.containsAny(isHangOut, "是")) {
+                    record.set("isHangOut", "1");
+                }
+                if (StrUtil.containsAny(isPartTime, "否")) {
+                    record.set("isHangOut", "0");
+                }
+
+                //是否纪委。。。。。
+                String isInspectionPartJob = row.getCell(19).getStringCellValue();
+                record.set("isInspectionPartJob", null);
+                if (StrUtil.isNotEmpty(isInspectionPartJob)) {
+                    if (StrUtil.containsAny(isInspectionPartJob, "是")) {
+                        record.set("isInspectionPartJob", "1");
+                    }
+                    if (StrUtil.containsAny(isInspectionPartJob, "否")) {
+                        record.set("isInspectionPartJob", "0");
+                    }
+                }
+
+                //干部来源
+                String cadreSources = row.getCell(20).getStringCellValue();
+                record.set("cadreSources", null);
+                if (StrUtil.isNotEmpty(cadreSources)) {
+                    if (StrUtil.containsAny(cadreSources, "人才")) {
+                        record.set("cadreSources", "8");
+                    } else if (StrUtil.containsAny(cadreSources, "待业大中专毕业生")) {
+                        record.set("cadreSources", "3");
+                    } else if (StrUtil.containsAny(cadreSources, "返乡农民工")) {
+                        record.set("cadreSources", "6");
+                    } else if (StrUtil.containsAny(cadreSources, "高校毕业生")) {
+                        record.set("cadreSources", "2");
+                    } else if (StrUtil.containsAny(cadreSources, "农村专业大户")) {
+                        record.set("cadreSources", "4");
+                    } else if (StrUtil.equals(cadreSources, "其他")) {
+                        record.set("cadreSources", "9");
+                    } else if (StrUtil.containsAny(cadreSources, "群团", "企事业单位")) {
+                        record.set("cadreSources", "1");
+                    } else if (StrUtil.containsAny(cadreSources, "私营企业主")) {
+                        record.set("cadreSources", "5");
+                    } else if (StrUtil.containsAny(cadreSources, "原任村两委")) {
+                        record.set("cadreSources", "4");
+                    } else if (StrUtil.containsAny(cadreSources, "物流服务企业")) {
+                        record.set("cadreSources", "5");
+                    } else {
+                        record.set("cadreSources", cadreSources);
+                    }
+                }
+
+                //任职情况
+                String appointment = row.getCell(21).getStringCellValue();
+                record.set("appointment",null);
+                if(StrUtil.isNotEmpty(appointment)){
+                    if(StrUtil.containsAny(appointment,"新进","新任")){
+                        record.set("appointment","1");
+                    }
+                    if(StrUtil.containsAny(appointment,"转任")){
+                        record.set("appointment","3");
+                    }
+                    if(StrUtil.containsAny(appointment,"继任")){
+                        record.set("appointment","2");
+                    }
+                }
+
+                //手机号
+                XSSFCell phoneCell = row.getCell(22);
+                record.set("phone", null);
+                if(ObjectUtil.isNotNull(phoneCell)) {
+                    String phone = phoneCell.getStringCellValue();
+                    if(StrUtil.isNotEmpty(phone)) {
+                        record.set("phone", phone);
+                    }
+                }
+
+                //简历
+                String a01701 = row.getCell(23).getStringCellValue();
+                record.set("a1701",StrUtil.isNotEmpty(a01701)?a01701:null);
+                //备注
+                String mark = row.getCell(24).getStringCellValue();
+                record.set("mark",StrUtil.isNotEmpty(mark)?mark:null);
+
+                saveRecordList.add(record);
+
+            }
+
+        }
+
+        if(CollectionUtil.isNotEmpty(saveRecordList)){
+            Db.use(DBConstant.PG).tx(()->{
+                Db.use(DBConstant.PG).batchSave("villageMemInfo",saveRecordList,1000);
+                return true;
+            });
+        }
+    }
+
+
+    public String getTimeStr(XSSFCell hssfCell) {
+        int dformat = hssfCell.getCellStyle().getDataFormat();
+        SimpleDateFormat sdf = null;
+        if (Arrays.asList(14, 178, 192, 194, 208, 196, 210).contains(dformat)) {
+            sdf = new SimpleDateFormat("yyyy-MM-dd");
+        } else if (Arrays.asList(190, 191).contains(dformat)) {
+            sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm");
+        } else if (Arrays.asList(177, 182, 185).contains(dformat)) {
+            sdf = new SimpleDateFormat("yyyy年MM月dd日");
+        } else if (Arrays.asList(183, 186).contains(dformat)) {
+            sdf = new SimpleDateFormat("yyyy年MM月");
+        } else if (Arrays.asList(183, 200, 201, 202, 203).contains(dformat)) {
+            sdf = new SimpleDateFormat("HH:mm");
+        } else if (Arrays.asList(204, 205, 206, 207, 208).contains(dformat)) {
+            sdf = new SimpleDateFormat("HH时mm分");
+        } else if (Arrays.asList(184, 187).contains(dformat)) {
+            sdf = new SimpleDateFormat("MM月dd日");
+        } else {
+            sdf = new SimpleDateFormat("yyyy-MM-dd");
+        }
+        return sdf.format(hssfCell.getDateCellValue());
+    }
+
+
+    public void selectB0114(){
+        //机构编码的问题
+        List<String> b0114 = Db.use(PG).find("select \"B0114\" from \"b01\" where \"B0114\" is not null and \"B0114\" <> '' and \"isDelete\" = 0")
+                .stream().map(var -> "'" + var.getStr("B0114") + "'").collect(Collectors.toList());
+
+
+        List<Record> sqlserverB01 = Db.use(SQLSERVER).find("select b0114 from [区县02涪陵区].[dbo].[b01] where b0114 in (" + CollectionUtil.join(b0114, ",") + ") and b0114 is not null and b0114 <> ''");
+
+        List<String> b01141 = sqlserverB01.stream().map(var -> var.getStr("b0114")).collect(Collectors.toList());
+
+        List<Record> saveRecordList = new ArrayList<>();
+        for (String s : b0114) {
+            if(!b01141.contains(s.replaceAll("'",""))){
+                Record record = new Record().set("B0114",s.replaceAll("'",""));
+                saveRecordList.add(record);
+            }
+        }
+
+        if(CollectionUtil.isNotEmpty(saveRecordList)) {
+            Db.use(PG).delete("delete from \"b01_re\"");
+            Db.use(PG).batchSave("b01_re", saveRecordList, 1000);
+        }
+
+
+        //人员身份证的问题
+        List<Record> a0184List = Db.use(PG).find("select \"a01\".\"A0184\" from \"a01\" inner join \"a02\" on \"a01\".\"A0000\" = \"a02\".\"A0000\" and \"a02\".\"A0255\" = '1' inner join \"b01\" on \"a02\".\"A0201B\" = \"b01\".\"id\" and \"b01\".\"isDelete\" = 0 where \"a01\".\"A0184\" is not null and \"a01\".\"A0184\" <> ''");
+
+        List<String> a0184 = a0184List.stream().map(var -> "'" + var.getStr("A0184").toUpperCase() + "'").collect(Collectors.toList());
+
+        List<List<String>> list = this.subList(1000, a0184);
+        Set<String> a0184Set = new HashSet<>();
+
+        for (List<String> strings : list) {
+            a0184Set.addAll(Db.use(SQLSERVER).find("select *,upper(a0184) as a0184UpCase from [区县02涪陵区].[dbo].[a01] where upper(a0184) in ("+CollectionUtil.join(strings,",")+")")
+            .stream().map(var->var.getStr("a0184UpCase")).collect(Collectors.toSet()));
+        }
+
+        List<Record> saveRecordA0184List = new ArrayList<>();
+        for (Record record : a0184List) {
+            String pgA0184 = record.getStr("A0184").toUpperCase();
+            if(!a0184Set.contains(pgA0184)){
+                Record recorda0184 = new Record();
+                recorda0184.set("id",StrKit.getRandomUUID().toUpperCase());
+                recorda0184.set("A0184",pgA0184);
+                saveRecordA0184List.add(recorda0184);
+            }
+        }
+
+        if(CollectionUtil.isNotEmpty(saveRecordA0184List)) {
+            Db.use(PG).delete("delete from \"a01_re\"");
+            Db.use(PG).batchSave("a01_re", saveRecordA0184List, 1000);
+        }
+        System.out.println("完");
+    }
+
+
+
+    /**
+     * List分页
+     */
+    public  List<List<String>> subList(Integer pageSize, List<String> list) {
+        List<List<String>> result = new ArrayList<>();
+        int subSize = pageSize;
+        int subCount = list.size();
+        int subPageTotal = (subCount / subSize) + ((subCount % subSize > 0) ? 1 : 0);
+        // 根据页码取数据
+        for (int i = 0, len = subPageTotal - 1; i <= len; i++) {
+            // 分页计算
+            int fromIndex = i * subSize;
+            int toIndex = ((i == len) ? subCount : ((i + 1) * subSize));
+            List<String> strings = list.subList(fromIndex, toIndex);
+            result.add(strings);
+        }
+        return result;
+    }
+
+
+    public void processA1701(){
+        List<Record> records = Db.use(PG).find("select * from \"a01_a1701\"");
+        for (Record record : records) {
+            String a1701 = record.getStr("A1701");
+            if(StrUtil.isNotEmpty(a1701)){
+                String[] a1701Arr = a1701.split("\n");
+                //段落
+                List<Map<String,String>> grapList = new ArrayList<>();
+                for (String s : a1701Arr) {
+
+                    if(grapList.size() == 0){
+                        if(s.length() > 18){
+                            String startStr = s.substring(0, 7);
+                            String __Str = s.substring(7, 9);
+                            String endStr = s.substring(9, 16);
+                            String spaceStr = s.substring(16, 18);
+                            if(ReUtil.isMatch("(^\\d{4}(\\.)\\d{1,2}$)", startStr) && ReUtil.isMatch("(^\\d{4}(\\.)\\d{1,2}$)", endStr) && StrUtil.equals(__Str,"--") &&StrUtil.equals(spaceStr,"  ")){
+                                Map<String,String> resumeMap = new LinkedHashMap<>();
+                                resumeMap.put("startStr",startStr);
+                                resumeMap.put("endStr",endStr);
+                                grapList.add(resumeMap);
+                            }
+                        }
+                        continue;
+                    }
+
+                    if(grapList.size() == 1){
+                        if(s.length() > 18){
+                            String startStr = s.substring(0, 7);
+                            String __Str = s.substring(7, 9);
+                            String endStr = s.substring(9, 16);
+                            String spaceStr = s.substring(16, 18);
+                            if((ReUtil.isMatch("(^\\d{4}(\\.)\\d{1,2}$)", startStr) && ReUtil.isMatch("(^\\d{4}(\\.)\\d{1,2}$)", endStr) && StrUtil.equals(__Str,"--") &&StrUtil.equals(spaceStr,"  ")) ||
+                                    (ReUtil.isMatch("(^\\d{4}(\\.)\\d{1,2}$)", startStr) && StrUtil.equals(endStr,"       ") && StrUtil.equals(__Str,"--") &&StrUtil.equals(spaceStr,"  "))){
+                                Map<String,String> resumeMap = new LinkedHashMap<>();
+                                resumeMap.put("startStr",startStr);
+                                resumeMap.put("endStr",endStr);
+
+                                Map<String, String> fristMap = grapList.get(0);
+                                if(!StrUtil.equals(fristMap.get("endStr"),startStr)){
+                                    a1701 = a1701.replace(fristMap.get("startStr")+"--"+fristMap.get("endStr")+"  ",fristMap.get("startStr")+"--"+startStr+"  ");
+                                }
+                                grapList.remove(0);
+                                grapList.add(resumeMap);
+                            }
+                        }
+                    }
+                }
+            }
+            record.set("A1701",a1701);
+        }
+
+        if(CollectionUtil.isNotEmpty(records)){
+            Db.use(PG).batchUpdate("a01_a1701","A0000",records,1000);
+        }
+
+    }
 
 
 }

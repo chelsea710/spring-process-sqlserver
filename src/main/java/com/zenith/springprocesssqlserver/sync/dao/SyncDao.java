@@ -37,6 +37,10 @@ public class SyncDao {
         return Db.use(DBConstant.SQLSERVER).paginateByFullSql(pageNum,pageSize,"select count(*) from [区县02涪陵区].[dbo].[aphoto] ","select * from [区县02涪陵区].[dbo].[aphoto] order by leader_code ");
     }
 
+    public Record findSqlServerPhotoOdd(String leaderCode){
+        return Db.use(DBConstant.SQLSERVER).findFirst("select * from [区县02涪陵区].[dbo].[aphoto] where leader_code = ?",leaderCode);
+    }
+
     public List<Record> findSqlServerA02(){
         return Db.use(DBConstant.SQLSERVER).find("select * from [区县02涪陵区].[dbo].[A02] where a0255 = '1' ");
     }
