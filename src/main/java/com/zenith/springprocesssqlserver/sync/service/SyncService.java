@@ -1921,4 +1921,573 @@ public class SyncService {
     }
 
 
+    //恢复备份
+    public void processChangeData(){
+        int batchNum = 1000;
+        Db.use(PG).delete("delete from \"a01\"");
+        Db.use(PG).delete("delete from \"a02\"");
+        Db.use(PG).delete("delete from \"a05\"");
+        Db.use(PG).delete("delete from \"a06\"");
+        Db.use(PG).delete("delete from \"a08\"");
+        Db.use(PG).delete("delete from \"a14\"");
+        Db.use(PG).delete("delete from \"a15\"");
+        Db.use(PG).delete("delete from \"a29\"");
+        Db.use(PG).delete("delete from \"a30\"");
+        Db.use(PG).delete("delete from \"a36\"");
+        Db.use(PG).delete("delete from \"a99z1\"");
+        Db.use(PG).delete("delete from \"b01\"");
+        Db.use(PG).delete("delete from \"QxOrgShow\"");
+        Db.use("olap").delete("delete from \"mem_info\"");
+        Db.use("olap").delete("delete from \"mem_team\"");
+        Db.use("olap").delete("delete from \"mem_transfer\"");
+        Db.use("olap").delete("delete from \"org_info\"");
+        Db.use("olap").delete("delete from \"tj_tbsm_item_list\"");
+        Db.use("olap").delete("delete from \"ext_table\"");
+        List<Record> changeDataList = Db.use(PG).find("select * from \"changeData\"");
+        for (Record record : changeDataList) {
+            Map<String,String> orgIdMap = new HashMap<>();
+            String name = record.getStr("name");
+            String b0111 = record.getStr("B0111");
+            boolean isJcy = false;
+            if(StrUtil.containsAny(name,"jianchayuan")){
+                isJcy = true;
+            }
+            //由于班子成员有非中共党员没办法
+            if(ObjectUtil.equal(isJcy,false)) {
+                List<Record> memTeamList = Db.use("olap_" + name).find("select * from \"mem_team\"");
+                String fristB0111 = this.processGbDataBase(name, b0111, memTeamList,isJcy, batchNum,orgIdMap);
+                this.processOlapDataBase(name, b0111, fristB0111,memTeamList,orgIdMap);
+            } else {
+                List<Record> memTeamList = Db.use("olap_" + name).find("select * from \"mem_team\" where \"org_level_code\" like '001.001.051%'");
+                String fristB0111 = this.processGbDataBase(name, b0111, memTeamList, isJcy,batchNum,orgIdMap);
+                this.processOlapJCYDataBase(name, b0111, fristB0111,memTeamList,orgIdMap);
+            }
+        }
+    }
+
+
+    //处理统计数据库的层级码
+    public void processOlapJCYDataBase(String name,String b0111,String fristB0111,List<Record> memTeamList,Map<String,String> orgIdMap){
+        List<Record> memInfoList = Db.use("olap_" + name).find("select * from \"mem_info\" where \"org_level_code\" like '001.001.051%'");
+        for (Record memInfoRecord : memInfoList) {
+            String memLevelCode = memInfoRecord.getStr("org_level_code");
+            memInfoRecord.set("org_level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            memInfoRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(memInfoList)){
+            Db.use("olap").batchSave("mem_info",memInfoList,1000);
+        }
+
+        for (Record memTeamRecord : memTeamList) {
+            String memLevelCode = memTeamRecord.getStr("org_level_code");
+            memTeamRecord.set("org_level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            memTeamRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(memTeamList)){
+            Db.use("olap").batchSave("mem_team",memTeamList,1000);
+        }
+
+        List<Record> memTransferList = Db.use("olap_" + name).find("select * from \"mem_transfer\" where \"org_level_code\" like '001.001.051%'");
+        for (Record memTransferRecord : memTransferList) {
+            String memLevelCode = memTransferRecord.getStr("org_level_code");
+            memTransferRecord.set("org_level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            memTransferRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(memTransferList)){
+            Db.use("olap").batchSave("mem_transfer",memTransferList,1000);
+        }
+
+        List<Record> orgInfoList = Db.use("olap_" + name).find("select * from \"org_info\" where \"level_code\" like '001.001.051%'");
+        for (Record orgInfoRecord : orgInfoList) {
+            if(orgIdMap.containsKey(orgInfoRecord.getStr("gb_id"))){
+                orgInfoRecord.set("gb_id",orgIdMap.get(orgInfoRecord.getStr("gb_id")));
+            }
+            String memLevelCode = orgInfoRecord.getStr("level_code");
+            orgInfoRecord.set("level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            orgInfoRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(orgInfoList)){
+            Db.use("olap").batchSave("org_info",orgInfoList,1000);
+        }
+
+        List<Record> extTableList = Db.use("olap_" + name).find("select * from \"ext_table\" where \"level_code\" like '001.001.051%'");
+        for (Record extTableRecord : extTableList) {
+            String memLevelCode = extTableRecord.getStr("level_code");
+            extTableRecord.set("level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            extTableRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(extTableList)){
+            Db.use("olap").batchSave("ext_table",extTableList,1000);
+        }
+
+        List<Record> tbsmItemList = Db.use("olap_" + name).find("select * from \"tj_tbsm_item_list\" where \"UNID\" like '001.001.051%'");
+        for (Record tbsmRecord : tbsmItemList) {
+            String memLevelCode = tbsmRecord.getStr("UNID");
+            tbsmRecord.set("UNID",memLevelCode.replaceFirst(fristB0111,b0111));
+            tbsmRecord.set("TTIT000",StrUtil.uuid().toUpperCase());
+        }
+        if(CollectionUtil.isNotEmpty(tbsmItemList)){
+            Db.use("olap").batchSave("tj_tbsm_item_list",tbsmItemList,1000);
+        }
+    }
+
+
+
+    //处理统计数据库的层级码
+    public void processOlapDataBase(String name,String b0111,String fristB0111,List<Record> memTeamList,Map<String,String> orgIdMap){
+        List<Record> memInfoList = Db.use("olap_" + name).find("select * from \"mem_info\" ");
+        for (Record memInfoRecord : memInfoList) {
+            String memLevelCode = memInfoRecord.getStr("org_level_code");
+            memInfoRecord.set("org_level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            memInfoRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(memInfoList)){
+            Db.use("olap").batchSave("mem_info",memInfoList,1000);
+        }
+
+        for (Record memTeamRecord : memTeamList) {
+            String memLevelCode = memTeamRecord.getStr("org_level_code");
+            memTeamRecord.set("org_level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            memTeamRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(memTeamList)){
+            Db.use("olap").batchSave("mem_team",memTeamList,1000);
+        }
+
+        List<Record> memTransferList = Db.use("olap_" + name).find("select * from \"mem_transfer\"");
+        for (Record memTransferRecord : memTransferList) {
+            String memLevelCode = memTransferRecord.getStr("org_level_code");
+            memTransferRecord.set("org_level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            memTransferRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(memTransferList)){
+            Db.use("olap").batchSave("mem_transfer",memTransferList,1000);
+        }
+
+        List<Record> orgInfoList = Db.use("olap_" + name).find("select * from \"org_info\"");
+        for (Record orgInfoRecord : orgInfoList) {
+            if(orgIdMap.containsKey(orgInfoRecord.getStr("gb_id"))){
+                orgInfoRecord.set("gb_id",orgIdMap.get(orgInfoRecord.getStr("gb_id")));
+            }
+            String memLevelCode = orgInfoRecord.getStr("level_code");
+            orgInfoRecord.set("level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            orgInfoRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(orgInfoList)){
+            Db.use("olap").batchSave("org_info",orgInfoList,1000);
+        }
+
+        List<Record> extTableList = Db.use("olap_" + name).find("select * from \"ext_table\"");
+        for (Record extTableRecord : extTableList) {
+            String memLevelCode = extTableRecord.getStr("level_code");
+            extTableRecord.set("level_code",memLevelCode.replaceFirst(fristB0111,b0111));
+            extTableRecord.remove("id");
+        }
+        if(CollectionUtil.isNotEmpty(extTableList)){
+            Db.use("olap").batchSave("ext_table",extTableList,1000);
+        }
+
+        List<Record> tbsmItemList = Db.use("olap_" + name).find("select * from \"tj_tbsm_item_list\"");
+        for (Record tbsmRecord : tbsmItemList) {
+            String memLevelCode = tbsmRecord.getStr("UNID");
+            tbsmRecord.set("UNID",memLevelCode.replaceFirst(fristB0111,b0111));
+            tbsmRecord.set("TTIT000",StrUtil.uuid().toUpperCase());
+        }
+        if(CollectionUtil.isNotEmpty(tbsmItemList)){
+            Db.use("olap").batchSave("tj_tbsm_item_list",tbsmItemList,1000);
+        }
+    }
+
+
+    //处理干部数据库的层级码
+    public String processGbDataBase(String name,String b0111,List<Record> memTeamList,boolean isJcy,Integer batchNum,Map<String,String> orgIdMap){
+        //1:除了 公务员 中层正职 还有 班子成员的人
+        String jcyLike = "";
+        if(isJcy){
+            jcyLike = " \"b01\".\"B0111\" like '001.001.051%' ";
+        }
+        Set<String> memTeamA000Set = memTeamList.stream().filter(var -> StrUtil.isNotEmpty(var.getStr("gb_mem_id"))).map(var -> var.getStr("gb_mem_id")).collect(Collectors.toSet());
+        Set<String> containsA0000List = new HashSet<>();
+        List<Record> a01SaveList = new ArrayList<>();
+        List<Record> a01List = Db.use("gb_" + name).find("select * from \"a01\" ");
+        List<Record> a0000List = Db.use("gb_" + name).find("select \"a01\".\"A0000\" from \"a01\" " +
+                "inner join \"a02\" on \"a01\".\"A0000\" = \"a02\".\"A0000\" and \"a02\".\"A0255\" = '1' " +
+                "inner join \"b01\" on \"a02\".\"A0201B\" = \"b01\".\"id\" and \"b01\".\"isDelete\" = 0 " + (StrUtil.isNotEmpty(jcyLike)?" where "+jcyLike:"") +
+                "group by \"a01\".\"A0000\"");
+        Set<String> a0000Set = a0000List.stream().filter(var -> StrUtil.isNotEmpty(var.getStr("A0000"))).map(var->var.getStr("A0000")).collect(Collectors.toSet());
+        for (Record record : a01List) {
+            if(a0000Set.contains(record.getStr("A0000")) && (StrUtil.equalsAny(record.getStr("A0160"),"1","5","6") || StrUtil.equals(record.getStr("A01Z110"),"1") || memTeamA000Set.contains(record.getStr("A0000")))){
+                a01SaveList.add(record);
+                containsA0000List.add(record.getStr("A0000"));
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a01SaveList)) {
+            Db.use(PG).batchSave("a01", a01SaveList, batchNum);
+        }
+
+        List<Record> a02SaveList = new ArrayList<>();
+        List<Record> a02List = Db.use("gb_" + name).find("select * from \"a02\" where \"A0255\" = '1' ");
+        for (Record record : a02List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a02SaveList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a02SaveList)) {
+            Db.use(PG).batchSave("a02", a02SaveList, batchNum);
+        }
+
+        List<Record> a05SaveList = new ArrayList<>();
+        List<Record> a05List = Db.use("gb_" + name).find("select * from \"a05\"  ");
+        for (Record record : a05List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a05SaveList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a05SaveList)) {
+            Db.use(PG).batchSave("a05", a05SaveList, batchNum);
+        }
+
+
+        List<Record> a06SaveList = new ArrayList<>();
+        List<Record> a06List = Db.use("gb_" + name).find("select * from \"a06\" ");
+        for (Record record : a06List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a06SaveList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a06SaveList)) {
+            Db.use(PG).batchSave("a06", a06SaveList, batchNum);
+        }
+
+        List<Record> a08SaveList = new ArrayList<>();
+        List<Record> a08List = Db.use("gb_" + name).find("select * from \"a08\" ");
+        for (Record record : a08List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a08SaveList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a08SaveList)) {
+            Db.use(PG).batchSave("a08", a08SaveList, batchNum);
+        }
+
+        List<Record> a14SaveList = new ArrayList<>();
+        List<Record> a14List = Db.use("gb_" + name).find("select * from \"a14\" ");
+        for (Record record : a14List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a14SaveList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a14SaveList)) {
+            Db.use(PG).batchSave("a14", a14SaveList, batchNum);
+        }
+
+
+        List<Record> a15SaveList = new ArrayList<>();
+        List<Record> a15List = Db.use("gb_" + name).find("select * from \"a15\" ");
+        for (Record record : a15List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a15SaveList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a15SaveList)) {
+            Db.use(PG).batchSave("a15", a15SaveList, batchNum);
+        }
+
+        List<Record> a29SaveList = new ArrayList<>();
+        List<Record> a29List = Db.use("gb_" + name).find("select * from \"a29\" ");
+        for (Record record : a29List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a29SaveList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a29SaveList)) {
+            Db.use(PG).batchSave("a29", a29SaveList, batchNum);
+        }
+
+        List<Record> a30SaveListList = new ArrayList<>();
+        List<Record> a30List = Db.use("gb_" + name).find("select * from \"a30\" ");
+        for (Record record : a30List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a30SaveListList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a30SaveListList)) {
+            Db.use(PG).batchSave("a30", a30SaveListList, batchNum);
+        }
+
+
+        List<Record> a36SaveList = new ArrayList<>();
+        List<Record> a36List = Db.use("gb_" + name).find("select * from \"a36\" ");
+        for (Record record : a36List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a36SaveList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a36SaveList)) {
+            Db.use(PG).batchSave("a36", a36SaveList, batchNum);
+        }
+
+        List<Record> a99z1SaveList = new ArrayList<>();
+        List<Record> a99z1List = Db.use("gb_" + name).find("select * from \"a99z1\" ");
+        for (Record record : a99z1List) {
+            if(containsA0000List.contains(record.getStr("A0000"))){
+                a99z1SaveList.add(record);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(a99z1SaveList)) {
+            Db.use(PG).batchSave("a99z1", a99z1SaveList, batchNum);
+        }
+
+        List<Record> b01List = Db.use("gb_" + name).find("select * from \"b01\" where 1=1  "+(StrUtil.isNotEmpty(jcyLike)?" and "+jcyLike:"")+" order by \"B0111\"");
+        Record fristB01 = b01List.get(0);
+        String fristB0111Str = fristB01.getStr("B0111");
+        for (Record b01Record : b01List) {
+            b01Record.set("B0111",b01Record.getStr("B0111").replaceFirst(fristB0111Str,b0111));
+            if(StrUtil.equals(b01Record.getStr("B0121"),"-1")){
+                int i = b0111.lastIndexOf(".");
+                b01Record.set("B0121",b0111.substring(0,i));
+            } else {
+                b01Record.set("B0121",b01Record.getStr("B0121").replaceFirst(fristB0111Str,b0111));
+            }
+            if(StrUtil.equals(b01Record.getStr("id"),"1")){
+                String uuid = StrKit.getRandomUUID().toUpperCase();
+                orgIdMap.put("1",uuid);
+                b01Record.set("id",uuid);
+            }
+        }
+
+        if(CollectionUtil.isNotEmpty(b01List)) {
+            Db.use(PG).batchSave("b01", b01List, batchNum);
+        }
+
+        List<Record> qxOrgShowList = Db.use("gb_" + name).find("select * from \"QxOrgShow\" where \"type\" = '1'");
+        if(CollectionUtil.isNotEmpty(qxOrgShowList)){
+            Db.use(PG).batchSave("QxOrgShow",qxOrgShowList,batchNum);
+        }
+
+        return fristB0111Str;
+    }
+
+
+
+    public void uploadPic() throws Exception {
+        List<Record> records = Db.use(PG).find("select * from \"changeData\"");
+        for (Record record : records) {
+            String name = record.getStr("name");
+            List<Record> memTeamList = Db.use("olap_" + name).find("select * from \"mem_team\"");
+            Set<String> memTeamA000Set = memTeamList.stream().filter(var -> StrUtil.isNotEmpty(var.getStr("gb_mem_id"))).map(var -> var.getStr("gb_mem_id")).collect(Collectors.toSet());
+            List<Record> a01List = Db.use("gb_" + name).find("select \"A0198\",\"A0160\",\"A01Z110\" from \"a01\" where \"A0198\" is not null and \"A0198\" <> ''");
+            for (Record a01Record : a01List) {
+                if(StrUtil.equalsAny(a01Record.getStr("A0160"),"1","5","6") || StrUtil.equals(a01Record.getStr("A01Z110"),"1") || memTeamA000Set.contains(a01Record.getStr("A0000"))){
+                    String a0198 = a01Record.getStr("A0198");
+                    File file = new File("/home/" + name + "/gb1809/webapp" +a0198);
+                    if(ObjectUtil.isNotNull(file) && file.exists()){
+                        FileInputStream fileInputStream = new FileInputStream(file);
+                        FileOutputStream fileOutputStream = new FileOutputStream(new File("/tmp/return/Photos/"+file.getName()));
+                        IoUtil.copy(fileInputStream,fileOutputStream);
+                        fileInputStream.close();
+                        fileOutputStream.close();
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * 最后的合并
+     */
+    public void result() {
+
+        //合并分节点数据
+        List<Record> a01RecordList = Db.use("gb_2020_pro").find("select * from \"a01\"");
+        Db.use(PG).delete("delete from \"a01_nodeData\"");
+        Db.use(PG).batchSave("a01_nodeData",a01RecordList,1000);
+        //重复A0000的人员
+        List<Record> replace = Db.use(PG).find("select \"A0000\" from \"a01\" where \"A0000\" in (select \"A0000\" from \"a01_nodeData\")");
+        //哪里统计了这些就哪里保留
+        Db.use("olap").delete("delete from \"a01_pro\"");
+        Db.use("olap").batchSave("a01_pro",replace,1000);
+        Db.use("olap_2021_pro").delete("delete from \"a01_pro\"");
+        Db.use("olap_2021_pro").batchSave("a01_pro",replace,1000);
+        //中心节点统计了 分节点删除
+        List<Record> records = Db.use("olap").find("select \"gb_mem_id\" as \"A0000\" from \"mem_info\" where \"change_status\" in (0,1) and \"gb_mem_id\" in (select * from \"a01_pro\")");
+        List<Record> nodeRecords = Db.use("olap_2021_pro").find("select \"gb_mem_id\" as \"A0000\" from \"mem_info\" where \"change_status\" in (0,1) and \"gb_mem_id\" in (select * from \"a01_pro\")");
+        //如果都统计了就提醒
+        List<String> dontNotList = new ArrayList<>();
+        List<String> replaceList = new ArrayList<>();
+        Set<String> zxSet = records.stream().map(var -> var.getStr("A0000")).collect(Collectors.toSet());
+        Set<String> nodeSet = nodeRecords.stream().map(var -> var.getStr("A0000")).collect(Collectors.toSet());
+        for (Record record : replace) {
+            String a0000 = record.getStr("A0000");
+            if(zxSet.contains(a0000) && nodeSet.contains(a0000)){
+                replaceList.add(a0000);
+            }
+            if(!zxSet.contains(a0000) && !nodeSet.contains(a0000)){
+                dontNotList.add(a0000);
+            }
+        }
+        if(CollectionUtil.isNotEmpty(replaceList)){
+            System.out.println("重复"+CollectionUtil.join(replaceList.stream().map(var-> "'"+var+"'").collect(Collectors.toList()), ","));
+            System.exit(0);
+        }
+
+        //分节点统计了 中心节点就删除 没有重复的情况
+        Db.use("gb_2020_pro").delete("delete from \"a01_pro\"");
+        Db.use("gb_2020_pro").batchSave("a01_pro",records,1000);
+        Db.use("gb_2020_pro").delete("delete from \"a01\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use("gb_2020_pro").delete("delete from \"a02\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use("gb_2020_pro").delete("delete from \"a05\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use("gb_2020_pro").delete("delete from \"a06\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use("gb_2020_pro").delete("delete from \"a08\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use("gb_2020_pro").delete("delete from \"a14\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use("gb_2020_pro").delete("delete from \"a15\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use("gb_2020_pro").delete("delete from \"a29\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use("gb_2020_pro").delete("delete from \"a36\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use("gb_2020_pro").delete("delete from \"a99z1\" where \"A0000\" in (select * from \"a01_pro\")");
+        //中心节点统计了 分节点就删除 没有重复的情况
+        Db.use(PG).delete("delete from \"a01_pro\"");
+        Db.use(PG).batchSave("a01_pro",nodeRecords,1000);
+        Db.use(PG).delete("delete from \"a01\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a02\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a05\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a06\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a08\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a14\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a15\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a29\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a30\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a36\" where \"A0000\" in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a99z1\" where \"A0000\" in (select * from \"a01_pro\")");
+
+        //还有一种情况他妈的两边都没统计 留中心节点
+        if(CollectionUtil.isNotEmpty(dontNotList)){
+            List<Record> recordList = new ArrayList<>();
+            for (String s : dontNotList) {
+                Record record = new Record();
+                record.set("A0000",s);
+                recordList.add(record);
+            }
+            Db.use(PG).batchSave("a01_replace",recordList,1000);
+            List<String> collect = dontNotList.stream().map(var -> "'" + var + "'").collect(Collectors.toList());
+            Db.use("gb_2020_pro").delete("delete from \"a01\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+            Db.use("gb_2020_pro").delete("delete from \"a02\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+            Db.use("gb_2020_pro").delete("delete from \"a05\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+            Db.use("gb_2020_pro").delete("delete from \"a06\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+            Db.use("gb_2020_pro").delete("delete from \"a08\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+            Db.use("gb_2020_pro").delete("delete from \"a14\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+            Db.use("gb_2020_pro").delete("delete from \"a15\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+            Db.use("gb_2020_pro").delete("delete from \"a29\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+            Db.use("gb_2020_pro").delete("delete from \"a36\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+            Db.use("gb_2020_pro").delete("delete from \"a99z1\" where \"A0000\" in ("+CollectionUtil.join(collect,",")+")");
+        }
+
+        a01RecordList = Db.use("gb_2020_pro").find("select * from \"a01\"");
+        Db.use(PG).batchSave("a01",a01RecordList,1000);
+
+        List<Record> a02RecordList = Db.use("gb_2020_pro").find("select * from \"a02\"");
+        for (Record record : a02RecordList) {
+            record.set("A0200",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a02",a02RecordList,1000);
+
+        List<Record> a05recordList = Db.use("gb_2020_pro").find("select * from \"a05\"");
+        for (Record record : a05recordList) {
+            record.set("A0500",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a05",a05recordList,1000);
+
+        List<Record> a06recordList = Db.use("gb_2020_pro").find("select * from \"a06\"");
+        for (Record record : a06recordList) {
+            record.set("A0600",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a06",a06recordList,1000);
+
+        List<Record> a08recordList = Db.use("gb_2020_pro").find("select * from \"a08\"");
+        for (Record record : a08recordList) {
+            record.set("A0800",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a08",a08recordList,1000);
+
+        List<Record> a14recordList = Db.use("gb_2020_pro").find("select * from \"a14\"");
+        for (Record record : a14recordList) {
+            record.set("A1400",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a14",a14recordList,1000);
+
+        List<Record> a15recordList = Db.use("gb_2020_pro").find("select * from \"a15\"");
+        for (Record record : a15recordList) {
+            record.set("A1500",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a15",a15recordList,1000);
+
+        List<Record> a29recordList = Db.use("gb_2020_pro").find("select * from \"a29\"");
+        for (Record record : a29recordList) {
+            record.set("A2900",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a29",a29recordList,1000);
+
+        List<Record> a36recordList = Db.use("gb_2020_pro").find("select * from \"a36\"");
+        for (Record record : a36recordList) {
+            record.set("A3600",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a36",a36recordList,1000);
+
+        List<Record> a30RecordList = Db.use("gb_2020_pro").find("select * from \"a30\"");
+        for (Record record : a30RecordList) {
+            record.set("A3000",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a30",a30RecordList,1000);
+
+        List<Record> a99z1recordList = Db.use("gb_2020_pro").find("select * from \"a99z1\"");
+        for (Record record : a99z1recordList) {
+            record.set("A99Z100",StrUtil.uuid().toUpperCase());
+        }
+        Db.use(PG).batchSave("a99z1",a99z1recordList,1000);
+
+        List<Record> b01recordList = Db.use("gb_2020_pro").find("select * from \"b01\"");
+        Db.use(PG).batchSave("b01",b01recordList,1000);
+
+        List<Record> QxOrgShow = Db.use("gb_2020_pro").find("select * from \"QxOrgShow\" where \"type\" = '1'");
+        Db.use(PG).batchSave("QxOrgShow",QxOrgShow,1000);
+
+        List<Record> memInforecordList = Db.use("olap_2021_pro").find("select * from \"mem_info\"");
+        for (Record record : memInforecordList) {
+            record.remove("id");
+        }
+        Db.use("olap").batchSave("mem_info",memInforecordList,1000);
+
+        List<Record> orginforecordList = Db.use("olap_2021_pro").find("select * from \"org_info\"");
+        for (Record record : orginforecordList) {
+            record.remove("id");
+        }
+        Db.use("olap").batchSave("org_info",orginforecordList,1000);
+
+        List<Record> memteamrecordList = Db.use("olap_2021_pro").find("select * from \"mem_team\"");
+        for (Record record : memteamrecordList) {
+            record.remove("id");
+        }
+        Db.use("olap").batchSave("mem_team",memteamrecordList,1000);
+
+        List<Record> memtransferrecordList = Db.use("olap_2021_pro").find("select * from \"mem_transfer\"");
+        for (Record record : memtransferrecordList) {
+            record.remove("id");
+        }
+        Db.use("olap").batchSave("mem_transfer",memtransferrecordList,1000);
+
+        List<Record> memExtTablerecordList = Db.use("olap_2021_pro").find("select * from \"ext_table\"");
+        for (Record record : memExtTablerecordList) {
+            record.remove("id");
+        }
+        Db.use("olap").batchSave("ext_table",memExtTablerecordList,1000);
+
+        List<Record> tbsmrecordList = Db.use("olap_2021_pro").find("select * from \"tj_tbsm_item_list\"");
+        for (Record record : tbsmrecordList) {
+            record.remove("id");
+        }
+        Db.use("olap").batchSave("tj_tbsm_item_list",tbsmrecordList,1000);
+
+    }
+
+
+
 }

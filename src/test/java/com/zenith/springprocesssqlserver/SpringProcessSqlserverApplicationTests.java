@@ -12,7 +12,6 @@ import org.springframework.boot.test.context.SpringBootTest;
 import java.util.ArrayList;
 import java.util.List;
 
-@SpringBootTest
 class SpringProcessSqlserverApplicationTests {
 
     @Autowired
@@ -36,6 +35,13 @@ class SpringProcessSqlserverApplicationTests {
     public void test(){
         String dateFormat = StrDateFormatUtil.getDateFormat("2019/11/21");
         System.out.println(dateFormat);
+    }
+
+    @Test
+    public void test01(){
+        String b011Str = "001.001.010.009.103";
+        int i = b011Str.lastIndexOf(".");
+        System.out.println(b011Str.substring(0,i));
     }
 
 }
