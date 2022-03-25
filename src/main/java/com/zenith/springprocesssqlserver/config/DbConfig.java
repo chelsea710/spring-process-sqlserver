@@ -61,22 +61,22 @@ public class DbConfig {
 //        return arp;
 //    }
 
-//    @Bean
-//    public ActiveRecordPlugin initPGActiveRecirdPlugin(){
-//        //sqlserver数据库
-//        DruidPlugin druidPlugin = new DruidPlugin(pgUrl, pgUsername, pgPassword.trim());
-//        druidPlugin.setDriverClass(pgDriverClass); //Users是你的数据库中的某一个表
-//        // 配置ActiveRecord插件
-//        ActiveRecordPlugin arp = new ActiveRecordPlugin(DBConstant.PG,druidPlugin);
-//        // 配置Sqlserver方言
-//        arp.setDialect(new PostgreSqlDialect());
-//        arp.setShowSql(true);
-//        // 配置属性名(字段名)大小写不敏感容器工厂
-//        arp.setContainerFactory(new CaseInsensitiveContainerFactory());
-//        druidPlugin.start();
-//        arp.start();
-//        return arp;
-//    }
+    @Bean
+    public ActiveRecordPlugin initPGActiveRecirdPlugin(){
+        //sqlserver数据库
+        DruidPlugin druidPlugin = new DruidPlugin(pgUrl, pgUsername, pgPassword.trim());
+        druidPlugin.setDriverClass(pgDriverClass); //Users是你的数据库中的某一个表
+        // 配置ActiveRecord插件
+        ActiveRecordPlugin arp = new ActiveRecordPlugin(DBConstant.PG,druidPlugin);
+        // 配置Sqlserver方言
+        arp.setDialect(new PostgreSqlDialect());
+        arp.setShowSql(true);
+        // 配置属性名(字段名)大小写不敏感容器工厂
+        arp.setContainerFactory(new CaseInsensitiveContainerFactory());
+        druidPlugin.start();
+        arp.start();
+        return arp;
+    }
 //
 //    @Bean
 //    public ActiveRecordPlugin initPGOlapActiveRecirdPlugin(){

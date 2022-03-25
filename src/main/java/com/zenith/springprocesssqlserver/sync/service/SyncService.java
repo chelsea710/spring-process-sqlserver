@@ -6,10 +6,8 @@ import cn.hutool.core.date.DateUtil;
 import cn.hutool.core.io.FileUtil;
 import cn.hutool.core.io.IoUtil;
 import cn.hutool.core.text.StrBuilder;
-import cn.hutool.core.util.IdcardUtil;
-import cn.hutool.core.util.ObjectUtil;
-import cn.hutool.core.util.ReUtil;
-import cn.hutool.core.util.StrUtil;
+import cn.hutool.core.util.*;
+import com.jfinal.kit.PathKit;
 import com.jfinal.kit.StrKit;
 import com.jfinal.plugin.activerecord.Db;
 import com.jfinal.plugin.activerecord.Page;
@@ -28,10 +26,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
-import java.io.ByteArrayInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -2489,5 +2484,113 @@ public class SyncService {
     }
 
 
+    /**
+     * 处理公务员表的数据监测
+     */
+    public void calc() {
+        try {
+            //获取所有的Excel
+            FileInputStream fileInputStream = new FileInputStream(new File("C:\\Users\\48951\\Desktop\\北碚的20220321更新\\2021年重庆市公务员统计表.xlsx"));
+            XSSFWorkbook xssfWorkbook = new XSSFWorkbook(fileInputStream);
+//            FileInputStream fileInputStream2 = new FileInputStream(new File("C:\\Users\\48951\\Desktop\\北碚的20220321更新\\2021年重庆市公务员统计表（组织专项--公务员）.xlsx"));
+            FileInputStream fileInputStream2 = new FileInputStream(new File("C:\\Users\\48951\\Desktop\\北碚的20220321更新\\2021年重庆市公务员统计表（公安专项）.xlsx"));
+            XSSFWorkbook xssfWorkbook2 = new XSSFWorkbook(fileInputStream2);
+            List<Record> recordList = Db.use(PG).find("select * from \"excelCalc\"");
+            for (Record record : recordList) {
+                Integer startRow = record.getInt("startRow");
+                Integer endRow = record.getInt("endRow");
+                Integer startCell = record.getInt("startCell");
+                Integer endCell = record.getInt("endCell");
+                String sheet = record.getStr("sheet");
+                XSSFSheet sheet1 = xssfWorkbook.getSheet(sheet);
+                XSSFSheet sheet2 = xssfWorkbook2.getSheet(sheet);
+
+                for(int row = startRow;row<=endRow;row++){
+                    for(int cell = startCell;cell<=endCell;cell++) {
+                        try {
+                            XSSFCell cell1 = sheet1.getRow(row).getCell(cell);
+                            XSSFCell cell2 = sheet2.getRow(row).getCell(cell);
+                            if (ObjectUtil.isNotNull(cell1) && ObjectUtil.isNotNull(cell2)) {
+                                double numericCellValue = cell1.getNumericCellValue();
+                                double numericCellValue1 = cell2.getNumericCellValue();
+                                if (ObjectUtil.isNotNull(numericCellValue)) {
+                                    if (numericCellValue - numericCellValue1 < 0) {
+                                        System.out.println(sheet + "第" + (row + 1) + "行" + "第" + (cell + 1) + "列 有问题");
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+//                                e.printStackTrace();
+                        }
+                    }
+                }
+            }
+            fileInputStream.close();
+            fileInputStream2.close();
+            System.out.println("完了");
+        } catch (Exception e){
+            StringWriter str = new StringWriter();
+            e.printStackTrace(new PrintWriter(str));
+            System.out.println(str);
+        }
+    }
+
+
+    /**
+     * 处理公务员表的数据监测
+     */
+    public void calc2() {
+        try {
+            //获取所有的Excel
+            FileInputStream fileInputStream = new FileInputStream(new File("C:\\Users\\48951\\Desktop\\北碚的20220321更新\\2021年重庆市公务员统计表.xlsx"));
+            XSSFWorkbook xssfWorkbook = new XSSFWorkbook(fileInputStream);
+//            FileInputStream fileInputStream2 = new FileInputStream(new File("C:\\Users\\48951\\Desktop\\北碚的20220321更新\\2021年重庆市公务员统计表（组织专项--公务员）.xlsx"));
+            FileInputStream fileInputStream2 = new FileInputStream(new File("C:\\Users\\48951\\Desktop\\北碚的20220321更新\\2021年重庆市公务员统计表（公安专项）.xlsx"));
+            XSSFWorkbook xssfWorkbook2 = new XSSFWorkbook(fileInputStream2);
+
+            FileInputStream fileInputStream3 = new FileInputStream(new File("C:\\Users\\48951\\Desktop\\北碚的20220321更新\\2021年重庆市公务员统计表（组织专项--公务员）.xlsx"));
+            XSSFWorkbook xssfWorkbook3 = new XSSFWorkbook(fileInputStream3);
+            List<Record> recordList = Db.use(PG).find("select * from \"excelCalc\"");
+            for (Record record : recordList) {
+                Integer startRow = record.getInt("startRow");
+                Integer endRow = record.getInt("endRow");
+                Integer startCell = record.getInt("startCell");
+                Integer endCell = record.getInt("endCell");
+                String sheet = record.getStr("sheet");
+                XSSFSheet sheet1 = xssfWorkbook.getSheet(sheet);
+                XSSFSheet sheet2 = xssfWorkbook2.getSheet(sheet);
+                XSSFSheet sheet3 = xssfWorkbook3.getSheet(sheet);
+
+                for(int row = startRow;row<=endRow;row++){
+                    for(int cell = startCell;cell<=endCell;cell++) {
+                        try {
+                            XSSFCell cell1 = sheet1.getRow(row).getCell(cell);
+                            XSSFCell cell2 = sheet2.getRow(row).getCell(cell);
+                            XSSFCell cell3 = sheet3.getRow(row).getCell(cell);
+                            if (ObjectUtil.isNotNull(cell1) && ObjectUtil.isNotNull(cell2) && ObjectUtil.isNotNull(cell3)) {
+                                double numericCellValue = cell1.getNumericCellValue();
+                                double numericCellValue1 = cell2.getNumericCellValue();
+                                double numericCellValue2 = cell3.getNumericCellValue();
+                                if (ObjectUtil.isNotNull(numericCellValue)) {
+                                    if (numericCellValue - numericCellValue1 - numericCellValue2 < 0) {
+                                        System.out.println(sheet + "第" + (row + 1) + "行" + "第" + (cell + 1) + "列 有问题");
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+//                                e.printStackTrace();
+                        }
+                    }
+                }
+            }
+            fileInputStream.close();
+            fileInputStream2.close();
+            System.out.println("完了");
+        } catch (Exception e){
+            StringWriter str = new StringWriter();
+            e.printStackTrace(new PrintWriter(str));
+            System.out.println(str);
+        }
+    }
 
 }

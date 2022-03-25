@@ -78,9 +78,6 @@ public class ResumeUtil {
                 }
         }
         for (i = 0; i < list.size(); i++) {
-            if(i == 4){
-                System.out.println("1");
-            }
             mapTemp = list.get(i);
             if (i == 0)
                 mapTemp.put("isFirst", Boolean.valueOf(true));

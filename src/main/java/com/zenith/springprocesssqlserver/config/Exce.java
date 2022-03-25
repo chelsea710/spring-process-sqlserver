@@ -69,32 +69,34 @@ public class Exce implements ApplicationRunner {
 //        syncService.uploadPic();
 //        syncService.processChangeData();
 //        syncService.result();
-        String Encrypt = "2d0a0ba4c857b8faad98663edcab76757b3fdeb00544fd737e98a55c147422d050643f179d67ef800bfab6a0408db7df0bfab6a0408db7df21bc8b0db3aa1828";
-        MessageDigest alg = MessageDigest.getInstance("MD5");
-        alg.update(Encrypt.getBytes("iso-8859-1"));
-        byte[] result = alg.digest();
+//        String Encrypt = "2d0a0ba4c857b8faad98663edcab76757b3fdeb00544fd737e98a55c147422d050643f179d67ef800bfab6a0408db7df0bfab6a0408db7df21bc8b0db3aa1828";
+//        MessageDigest alg = MessageDigest.getInstance("MD5");
+//        alg.update(Encrypt.getBytes("iso-8859-1"));
+//        byte[] result = alg.digest();
+//
+//        String strKey = byte2hex(result);
+//
+//        KeyGenerator keyGenerator = KeyGenerator.getInstance("DES");
+//        SecureRandom secureRandom = SecureRandom.getInstance("SHA1PRNG");
+//        secureRandom.setSeed(strKey.getBytes("iso-8859-1"));
+//        keyGenerator.init(56,secureRandom);
+//        SecretKey secretKey = keyGenerator.generateKey();
+//        Cipher cipher = Cipher.getInstance("DES/ECB/PKCS5Padding");
+//        cipher.init(2,secretKey);
+//
+//        InputStream is = new FileInputStream("C:\\Users\\48951\\Desktop\\基础人员数据_重庆市沙坪坝区丰文街道(0000044000040)_2022-01-27.bkrs");
+//        OutputStream out = new FileOutputStream("D:\\re");
+//        CipherOutputStream cos = new CipherOutputStream(out, cipher);
+//        byte[] buffer = new byte[1024];
+//        int r;
+//        while ((r = is.read(buffer)) >= 0)
+//            cos.write(buffer, 0, r);
+//        cos.close();
+//        out.close();
+//        is.close();
 
-        String strKey = byte2hex(result);
-
-        KeyGenerator keyGenerator = KeyGenerator.getInstance("DES");
-        SecureRandom secureRandom = SecureRandom.getInstance("SHA1PRNG");
-        secureRandom.setSeed(strKey.getBytes("iso-8859-1"));
-        keyGenerator.init(56,secureRandom);
-        SecretKey secretKey = keyGenerator.generateKey();
-        Cipher cipher = Cipher.getInstance("DES/ECB/PKCS5Padding");
-        cipher.init(2,secretKey);
-
-        InputStream is = new FileInputStream("C:\\Users\\48951\\Desktop\\基础人员数据_重庆市沙坪坝区丰文街道(0000044000040)_2022-01-27.bkrs");
-        OutputStream out = new FileOutputStream("D:\\re");
-        CipherOutputStream cos = new CipherOutputStream(out, cipher);
-        byte[] buffer = new byte[1024];
-        int r;
-        while ((r = is.read(buffer)) >= 0)
-            cos.write(buffer, 0, r);
-        cos.close();
-        out.close();
-        is.close();
-
+//        syncService.calc();
+        syncService.calc2();
         System.exit(0);
 
     }
