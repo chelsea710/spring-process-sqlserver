@@ -96,7 +96,11 @@ public class Exce implements ApplicationRunner {
 //        is.close();
 
 //        syncService.calc();
-        syncService.calc2();
+//        syncService.calc2();
+        syncService.processExcelDict();
+        syncService.processExcelOladDict();
+//        syncService.changeField();
+//        syncService.processCodeValueBySalay();
         System.exit(0);
 
     }

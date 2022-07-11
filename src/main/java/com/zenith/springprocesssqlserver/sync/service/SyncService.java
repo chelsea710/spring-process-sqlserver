@@ -32,8 +32,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static com.zenith.springprocesssqlserver.constant.DBConstant.PG;
-import static com.zenith.springprocesssqlserver.constant.DBConstant.SQLSERVER;
+import static com.zenith.springprocesssqlserver.constant.DBConstant.*;
 
 
 /**
@@ -2590,6 +2589,174 @@ public class SyncService {
             StringWriter str = new StringWriter();
             e.printStackTrace(new PrintWriter(str));
             System.out.println(str);
+        }
+    }
+
+
+    /**
+     * 处理贵州组织部的字典问题
+     */
+    public void processExcelDict() throws Exception{
+        FileInputStream inputStream = new FileInputStream(new File("C:\\Users\\48951\\Desktop\\贵州\\贵州公务员系统同步.xlsx"));
+        XSSFWorkbook xssfWorkbook = new XSSFWorkbook(inputStream);
+        XSSFSheet sheetAt = xssfWorkbook.getSheetAt(0);
+        Map<String,Set<String>> dictMap = new LinkedHashMap<>();
+        dictMap.put("base",new LinkedHashSet<>());
+        Set<String> dictSet = new HashSet<>();
+        for(int rowIndex = 1;rowIndex<sheetAt.getLastRowNum();rowIndex++){
+            XSSFRow row = sheetAt.getRow(rowIndex);
+            if(ObjectUtil.isNotNull(row.getCell(5))) {
+                String dictCodeTypeStr = row.getCell(5).getStringCellValue();
+                String explainStr = row.getCell(4).getStringCellValue();
+                if (StrUtil.isNotEmpty(dictCodeTypeStr)) {
+                    for (String s : dictCodeTypeStr.split(",")) {
+                        if(!dictSet.contains(s)) {
+                            dictMap.get("base").add(explainStr + "," + s);
+                            dictSet.add(s);
+                        }
+                    }
+                }
+            }
+        }
+        for (String dictKeySplitStr : dictMap.get("base")) {
+            String dictKeyStr = dictKeySplitStr.split(",")[1];
+            List<Record> dictRecordList = Db.use(PG).find("select * from \"code_value\" where \"CODE_TYPE\" = ? ORDER BY \"ININO\",\"CODE_VALUE\"", dictKeyStr);
+            Set<String> subCodeValueSet = dictRecordList.stream().map(var -> var.getStr("SUB_CODE_VALUE")).collect(Collectors.toSet());
+            XSSFSheet sheet = null;
+            if(ObjectUtil.isNull(xssfWorkbook.getSheet(dictKeySplitStr.split(",")[0]))) {
+                sheet = xssfWorkbook.createSheet(dictKeySplitStr.split(",")[0]);
+            } else {
+                sheet = xssfWorkbook.createSheet(dictKeySplitStr.split(",")[0]+dictKeyStr);
+            }
+            XSSFRow headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名称");
+            headerRow.createCell(1).setCellValue("代码");
+            int rowIndex = 1;
+            for (Record record : dictRecordList) {
+                if(!subCodeValueSet.contains(record.getStr("CODE_VALUE"))) {
+                    XSSFRow row = sheet.createRow(rowIndex);
+                    row.createCell(0).setCellValue(record.getStr("CODE_NAME"));
+                    row.createCell(1).setCellValue(record.getStr("CODE_VALUE"));
+                    rowIndex++;
+                }
+            }
+        }
+        FileOutputStream fileOutputStream = new FileOutputStream(new File("C:\\Users\\48951\\Desktop\\贵州\\贵州公务员系统同步"+DateUtil.format(new Date(),"yyyyMMddHHmmssSSS")+".xlsx"));
+        xssfWorkbook.write(fileOutputStream);
+        fileOutputStream.close();
+        inputStream.close();
+        xssfWorkbook.close();
+    }
+
+
+    /**
+     * 处理贵州组织部的字典问题
+     */
+    public void processExcelOladDict() throws Exception{
+        FileInputStream inputStream = new FileInputStream(new File("C:\\Users\\48951\\Desktop\\贵州\\贵州公务员统计系统同步.xlsx"));
+        XSSFWorkbook xssfWorkbook = new XSSFWorkbook(inputStream);
+        XSSFSheet sheetAt = xssfWorkbook.getSheetAt(0);
+        Map<String,Set<String>> dictMap = new LinkedHashMap<>();
+        dictMap.put("olap",new LinkedHashSet<>());
+        Set<String> dictSet = new HashSet<>();
+        for(int rowIndex = 1;rowIndex<sheetAt.getLastRowNum();rowIndex++){
+            XSSFRow row = sheetAt.getRow(rowIndex);
+            if(ObjectUtil.isNotNull(row.getCell(5))) {
+                String dictCodeTypeStr = row.getCell(5).getStringCellValue();
+                String explainStr = row.getCell(4).getStringCellValue();
+                if (StrUtil.isNotEmpty(dictCodeTypeStr)) {
+                    for (String s : dictCodeTypeStr.split(",")) {
+                        if(!dictSet.contains(s)) {
+                            dictMap.get("olap").add(explainStr + "," + s);
+                            dictSet.add(s);
+                        }
+                    }
+                }
+            }
+        }
+        for (String dictKeySplitStr : dictMap.get("olap")) {
+            String dictKeyStr = dictKeySplitStr.split(",")[1];
+            List<Record> dictRecordList = Db.use(OLAP).find("select * from \"dict\" where \"type_code\" = ? ORDER BY \"order_id\",\"code\"", dictKeyStr);
+            Set<String> subCodeValueSet = dictRecordList.stream().map(var -> var.getStr("parent_code")).collect(Collectors.toSet());
+            XSSFSheet sheet = null;
+            if(ObjectUtil.isNull(xssfWorkbook.getSheet(dictKeySplitStr.split(",")[0]))) {
+                sheet = xssfWorkbook.createSheet(dictKeySplitStr.split(",")[0]);
+            } else {
+                sheet = xssfWorkbook.createSheet(dictKeySplitStr.split(",")[0]+dictKeyStr);
+            }
+            XSSFRow headerRow = sheet.createRow(0);
+            headerRow.createCell(0).setCellValue("名称");
+            headerRow.createCell(1).setCellValue("代码");
+            int rowIndex = 1;
+            for (Record record : dictRecordList) {
+                if(!subCodeValueSet.contains(record.getStr("code"))) {
+                    XSSFRow row = sheet.createRow(rowIndex);
+                    row.createCell(0).setCellValue(record.getStr("name"));
+                    row.createCell(1).setCellValue(record.getStr("code"));
+                    rowIndex++;
+                }
+            }
+        }
+        FileOutputStream fileOutputStream = new FileOutputStream(new File("C:\\Users\\48951\\Desktop\\贵州\\贵州公务员统计系统同步"+DateUtil.format(new Date(),"yyyyMMddHHmmssSSS")+".xlsx"));
+        xssfWorkbook.write(fileOutputStream);
+        fileOutputStream.close();
+        inputStream.close();
+        xssfWorkbook.close();
+    }
+
+
+    /**
+     * 切换字段与对应的表
+     */
+    public void changeField() throws Exception {
+        File file = new File("C:\\Users\\48951\\Desktop\\贵州\\贵州公务员系统同步20220704095457745.xlsx");
+        FileInputStream inputStream = new FileInputStream(file);
+        XSSFWorkbook xssfWorkbook = new XSSFWorkbook(inputStream);
+        XSSFSheet sheetAt = xssfWorkbook.getSheetAt(0);
+        List<Record> saveRecordList = new ArrayList<>();
+        String tableName = "";
+        for(int rowIndex = 1;rowIndex < sheetAt.getLastRowNum();rowIndex++){
+            Record gzDataConfigRecord = new Record();
+            if(StrUtil.isNotEmpty(sheetAt.getRow(rowIndex).getCell(0).getStringCellValue()) && !StrUtil.equals(sheetAt.getRow(rowIndex).getCell(0).getStringCellValue(),tableName)) {
+                tableName = sheetAt.getRow(rowIndex).getCell(0).getStringCellValue();
+            }
+            String fieldDataBaseName = sheetAt.getRow(rowIndex).getCell(1).getStringCellValue();
+            String fieldExcelName = sheetAt.getRow(rowIndex).getCell(2).getStringCellValue();
+            String id = StrKit.getRandomUUID().toUpperCase();
+            gzDataConfigRecord.set("tableName",tableName).set("fieldDataBaseName",fieldDataBaseName)
+                    .set("fieldExcelName",fieldExcelName).set("id",id);
+            saveRecordList.add(gzDataConfigRecord);
+        }
+        if(CollectionUtil.isNotEmpty(saveRecordList)) {
+            Db.use(PG).tx(() -> {
+                Db.use(PG).delete("delete from \"gzDataSyncConfig\"");
+                Db.use(PG).batchSave("gzDataSyncConfig",saveRecordList,1000);
+                return true;
+            });
+        }
+    }
+
+    public void processCodeValueBySalay(){
+        List<String> fieldList = new ArrayList<>();
+        fieldList.add("XZ94");
+        fieldList.add("XZ95");
+        fieldList.add("XZ96");
+        fieldList.add("XZ97");
+        fieldList.add("A3385");
+        if(CollectionUtil.isNotEmpty(fieldList)) {
+            Db.use(PG).delete("delete from \"code_value\" where \"CODE_TYPE\" IN (" + CollectionUtil.join(fieldList.stream().map(var -> "'" + var + "'").collect(Collectors.toList()), ",") + ")");
+            for (String fieldStr : fieldList) {
+                List<Record> codeValueList = Db.use(PG).find("select * from \"code_value_zzb\" where \"CODE_TYPE\" = ? order by \"ININO\",\"CODE_VALUE\"", fieldStr);
+                Integer maxCodeSeq = Db.use(PG).queryInt("select max(\"CODE_VALUE_SEQ\") FROM \"code_value\"");
+                maxCodeSeq++;
+                for (Record record : codeValueList) {
+                    record.set("CODE_VALUE_SEQ", maxCodeSeq);
+                    maxCodeSeq++;
+                }
+                if (CollectionUtil.isNotEmpty(codeValueList)) {
+                    Db.use(PG).batchSave("code_value", codeValueList, 100);
+                }
+            }
         }
     }
 
