@@ -66,9 +66,9 @@ public class Exce implements ApplicationRunner {
         //替换简历不连续
 //        syncService.processA1701();
         //拉取照片
-//        syncService.uploadPic();
-//        syncService.processChangeData();
-//        syncService.result();
+        syncService.uploadPic();
+        syncService.processChangeData();
+        syncService.result();
 //        String Encrypt = "2d0a0ba4c857b8faad98663edcab76757b3fdeb00544fd737e98a55c147422d050643f179d67ef800bfab6a0408db7df0bfab6a0408db7df21bc8b0db3aa1828";
 //        MessageDigest alg = MessageDigest.getInstance("MD5");
 //        alg.update(Encrypt.getBytes("iso-8859-1"));
