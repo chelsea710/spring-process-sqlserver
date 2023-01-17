@@ -98,11 +98,11 @@ public class DbConfig {
         return arp;
     }
 
-//
+
 //    @Bean
 //    public ActiveRecordPlugin initPGOlapActiveRecirdPlugin(){
 //        //sqlserver数据库
-//        DruidPlugin druidPlugin = new DruidPlugin("jdbc:postgresql://127.0.0.1:5432/olap2021_test", pgUsername, pgPassword.trim());
+//        DruidPlugin druidPlugin = new DruidPlugin("jdbc:postgresql://23.133.10.200:5432/olap", pgUsername, pgPassword.trim());
 //        druidPlugin.setDriverClass("org.postgresql.Driver"); //Users是你的数据库中的某一个表
 //        // 配置ActiveRecord插件
 //        ActiveRecordPlugin arp = new ActiveRecordPlugin("olap",druidPlugin);
@@ -115,7 +115,7 @@ public class DbConfig {
 //        arp.start();
 //        return arp;
 //    }
-//
+
 //    @Bean
 //    public ActiveRecordPlugin initPGActiveLiangjiangGbPlugin(){
 //        List<Object> obj = this.processDataSource("gb_liangjiang");
@@ -779,7 +779,7 @@ public class DbConfig {
 //
 //    @Bean
 //    public ActiveRecordPlugin initPGActiveatongzhanGbPlugin(){
-//        List<Object> obj = this.processDataSource("gb_tongzhan");
+//        List<Object> obj = this.processDataSource("gb_gonganju");
 //        DruidPlugin druidPlugin = (DruidPlugin)obj.get(0);
 //        ActiveRecordPlugin arp = (ActiveRecordPlugin)obj.get(1);
 //        druidPlugin.start();
@@ -789,7 +789,7 @@ public class DbConfig {
 //
 //    @Bean
 //    public ActiveRecordPlugin initPGActivetongzhanpoOlapPlugin(){
-//        List<Object> obj = this.processDataSource("olap_tongzhan");
+//        List<Object> obj = this.processDataSource("olap_gonganju");
 //        DruidPlugin druidPlugin = (DruidPlugin)obj.get(0);
 //        ActiveRecordPlugin arp = (ActiveRecordPlugin)obj.get(1);
 //        druidPlugin.start();
@@ -1037,43 +1037,43 @@ public class DbConfig {
 //        return arp;
 //    }
 
-//    @Bean
-//    public ActiveRecordPlugin initPGActiveaproGbPlugin(){
-//        List<Object> obj = this.processDataSource("gb_2020_pro");
-//        DruidPlugin druidPlugin = (DruidPlugin)obj.get(0);
-//        ActiveRecordPlugin arp = (ActiveRecordPlugin)obj.get(1);
-//        druidPlugin.start();
-//        arp.start();
-//        return arp;
-//    }
-//
-//    @Bean
-//    public ActiveRecordPlugin initPGActiveolapProoOlapPlugin(){
-//        List<Object> obj = this.processDataSource("olap_2021_pro");
-//        DruidPlugin druidPlugin = (DruidPlugin)obj.get(0);
-//        ActiveRecordPlugin arp = (ActiveRecordPlugin)obj.get(1);
-//        druidPlugin.start();
-//        arp.start();
-//        return arp;
-//    }
+    @Bean
+    public ActiveRecordPlugin initPGActiveaproGbPlugin(){
+        List<Object> obj = this.processDataSource("gb_2020_pro");
+        DruidPlugin druidPlugin = (DruidPlugin)obj.get(0);
+        ActiveRecordPlugin arp = (ActiveRecordPlugin)obj.get(1);
+        druidPlugin.start();
+        arp.start();
+        return arp;
+    }
+
+    @Bean
+    public ActiveRecordPlugin initPGActiveolapProoOlapPlugin(){
+        List<Object> obj = this.processDataSource("olap_2021_pro");
+        DruidPlugin druidPlugin = (DruidPlugin)obj.get(0);
+        ActiveRecordPlugin arp = (ActiveRecordPlugin)obj.get(1);
+        druidPlugin.start();
+        arp.start();
+        return arp;
+    }
 
 
-//
-//    public List<Object> processDataSource(String areaName){
-//        List<Object> result = new ArrayList<>();
-//        DruidPlugin druidPlugin = new DruidPlugin("jdbc:postgresql://127.0.0.1:5432/"+areaName, "postgres", "20191809");
-//        druidPlugin.setDriverClass("org.postgresql.Driver"); //Users是你的数据库中的某一个表
-//        // 配置ActiveRecord插件
-//        ActiveRecordPlugin arp = new ActiveRecordPlugin(areaName,druidPlugin);
-//        // 配置Sqlserver方言
-//        arp.setDialect(new PostgreSqlDialect());
-//        arp.setShowSql(true);
-//        // 配置属性名(字段名)大小写不敏感容器工厂
-//        arp.setContainerFactory(new CaseInsensitiveContainerFactory());
-//        result.add(druidPlugin);
-//        result.add(arp);
-//        return result;
-//    }
+
+    public List<Object> processDataSource(String areaName){
+        List<Object> result = new ArrayList<>();
+        DruidPlugin druidPlugin = new DruidPlugin("jdbc:postgresql://127.0.0.1:5432/"+areaName, "postgres", "20191809");
+        druidPlugin.setDriverClass("org.postgresql.Driver"); //Users是你的数据库中的某一个表
+        // 配置ActiveRecord插件
+        ActiveRecordPlugin arp = new ActiveRecordPlugin(areaName,druidPlugin);
+        // 配置Sqlserver方言
+        arp.setDialect(new PostgreSqlDialect());
+        arp.setShowSql(true);
+        // 配置属性名(字段名)大小写不敏感容器工厂
+        arp.setContainerFactory(new CaseInsensitiveContainerFactory());
+        result.add(druidPlugin);
+        result.add(arp);
+        return result;
+    }
 
 
 

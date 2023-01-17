@@ -1931,6 +1931,11 @@ public class SyncService {
         Db.use(PG).delete("delete from \"a99z1\"");
         Db.use(PG).delete("delete from \"b01\"");
         Db.use(PG).delete("delete from \"QxOrgShow\"");
+        Db.use(PG).delete("delete from \"c_a01\"");
+        Db.use(PG).delete("delete from \"c_a02\"");
+        Db.use(PG).delete("delete from \"c_a03\"");
+        Db.use(PG).delete("delete from \"c_c01\"");
+        Db.use(PG).delete("delete from \"c_c02\"");
         Db.use("olap").delete("delete from \"mem_info\"");
         Db.use("olap").delete("delete from \"mem_team\"");
         Db.use("olap").delete("delete from \"mem_transfer\"");
@@ -1942,6 +1947,9 @@ public class SyncService {
             Map<String,String> orgIdMap = new HashMap<>();
             String name = record.getStr("name");
             String b0111 = record.getStr("B0111");
+            System.out.println();
+            System.out.println("正在执行"+name);
+            System.out.println();
             boolean isJcy = false;
             if(StrUtil.containsAny(name,"jianchayuan")){
                 isJcy = true;
@@ -2103,7 +2111,12 @@ public class SyncService {
         Set<String> memTeamA000Set = memTeamList.stream().filter(var -> StrUtil.isNotEmpty(var.getStr("gb_mem_id"))).map(var -> var.getStr("gb_mem_id")).collect(Collectors.toSet());
         Set<String> containsA0000List = new HashSet<>();
         List<Record> a01SaveList = new ArrayList<>();
-        List<Record> a01List = Db.use("gb_" + name).find("select * from \"a01\" ");
+        List<Record> a01List;
+        if(StrUtil.containsAny(name,"qijiang")){
+            a01List = Db.use("gb_" + name).find("select * from \"a01\" where \"A0000\" not in ('25E960EE-6677-4DC9-8853-D83631156160') ");
+        } else {
+            a01List = Db.use("gb_" + name).find("select * from \"a01\" ");
+        }
         List<Record> a0000List = Db.use("gb_" + name).find("select \"a01\".\"A0000\" from \"a01\" " +
                 "inner join \"a02\" on \"a01\".\"A0000\" = \"a02\".\"A0000\" and \"a02\".\"A0255\" = '1' " +
                 "inner join \"b01\" on \"a02\".\"A0201B\" = \"b01\".\"id\" and \"b01\".\"isDelete\" = 0 " + (StrUtil.isNotEmpty(jcyLike)?" where "+jcyLike:"") +
@@ -2259,6 +2272,32 @@ public class SyncService {
             Db.use(PG).batchSave("QxOrgShow",qxOrgShowList,batchNum);
         }
 
+        List<Record> ca01List = Db.use("gb_" + name).find("select * from \"c_a01\" ");
+        if(CollectionUtil.isNotEmpty(ca01List)){
+            Db.use(PG).batchSave("c_a01",ca01List,batchNum);
+        }
+
+        List<Record> ca02List = Db.use("gb_" + name).find("select * from \"c_a02\" ");
+        if(CollectionUtil.isNotEmpty(ca02List)){
+            Db.use(PG).batchSave("c_a02",ca02List,batchNum);
+        }
+
+        List<Record> ca03List = Db.use("gb_" + name).find("select * from \"c_a03\" ");
+        if(CollectionUtil.isNotEmpty(ca03List)){
+            Db.use(PG).batchSave("c_a03",ca03List,batchNum);
+        }
+
+        List<Record> cc01List = Db.use("gb_" + name).find("select * from \"c_c01\"");
+        if(CollectionUtil.isNotEmpty(cc01List)){
+            Db.use(PG).batchSave("c_c01",cc01List,batchNum);
+        }
+
+        List<Record> cc02List = Db.use("gb_" + name).find("select * from \"c_c02\"");
+        if(CollectionUtil.isNotEmpty(cc02List)){
+            Db.use(PG).batchSave("c_c02",cc02List,batchNum);
+        }
+
+
         return fristB0111Str;
     }
 
@@ -2266,11 +2305,14 @@ public class SyncService {
 
     public void uploadPic() throws Exception {
         List<Record> records = Db.use(PG).find("select * from \"changeData\"");
+        int index = 1;
         for (Record record : records) {
             String name = record.getStr("name");
             List<Record> memTeamList = Db.use("olap_" + name).find("select * from \"mem_team\"");
             Set<String> memTeamA000Set = memTeamList.stream().filter(var -> StrUtil.isNotEmpty(var.getStr("gb_mem_id"))).map(var -> var.getStr("gb_mem_id")).collect(Collectors.toSet());
             List<Record> a01List = Db.use("gb_" + name).find("select \"A0198\",\"A0160\",\"A01Z110\" from \"a01\" where \"A0198\" is not null and \"A0198\" <> ''");
+            System.out.println();
+            System.out.println(index+"正在下载"+name+"照片数据");
             for (Record a01Record : a01List) {
                 if(StrUtil.equalsAny(a01Record.getStr("A0160"),"1","5","6") || StrUtil.equals(a01Record.getStr("A01Z110"),"1") || memTeamA000Set.contains(a01Record.getStr("A0000"))){
                     String a0198 = a01Record.getStr("A0198");
@@ -2284,7 +2326,49 @@ public class SyncService {
                     }
                 }
             }
+            System.out.println();
+            System.out.println(index+name+"照片数据下载完成");
+            index++;
         }
+    }
+
+    public void resultDeleteFrist(){
+
+        //先删除所有不在统计系统的人员
+        List<Record> recordList = Db.use(OLAP).find("select \"gb_mem_id\" AS \"A0000\" from \"mem_info\" where \"gb_mem_id\" is not null");
+        List<Record> recordList1 = Db.use(OLAP).find("select \"gb_mem_id\" AS \"A0000\" from \"mem_team\" where \"gb_mem_id\" is not null");
+        Db.use(PG).delete("delete from \"a01_pro\"");
+        if(CollectionUtil.isNotEmpty(recordList)){
+            Db.use(PG).batchSave("a01_pro",recordList,1000);
+        }
+        if(CollectionUtil.isNotEmpty(recordList1)){
+            Db.use(PG).batchSave("a01_pro",recordList1,1000);
+        }
+        //中管干部去掉
+        List<Record> recordList2 = Db.use(PG).find("select \"a01\".\"A0000\" from \"a01\" inner join \"a02\" on \"a01\".\"A0000\" = \"a02\".\"A0000\" and \"a02\".\"A0255\" = '1' " +
+                " inner join \"b01\" on \"b01\".\"id\" = \"a02\".\"A0201B\" and \"b01\".\"isDelete\" = 0 where \"b01\".\"B0111\" like ? group by \"a01\".\"A0000\"", "001.001.008%");
+        if(CollectionUtil.isNotEmpty(recordList2)){
+            Db.use(PG).batchSave("a01_pro",recordList2,1000);
+        }
+
+        Db.use(PG).delete("delete from \"a01\" where \"A0000\" not in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a02\" where \"A0000\" not in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a05\" where \"A0000\" not in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a06\" where \"A0000\" not in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a08\" where \"A0000\" not in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a14\" where \"A0000\" not in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a15\" where \"A0000\" not in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a36\" where \"A0000\" not in (select * from \"a01_pro\")");
+        Db.use(PG).delete("delete from \"a99z1\" where \"A0000\" not in (select * from \"a01_pro\")");
+
+        List<Record> changeDataList = Db.use(PG).find("select * from \"changeData\"");
+        for (Record record : changeDataList) {
+            Map<String, String> orgIdMap = new HashMap<>();
+            String name = record.getStr("name");
+            String b0111 = record.getStr("B0111");
+            Db.use(PG).delete("delete from \"b01\" where \"B0111\" like ?",b0111+"%");
+        }
+
     }
 
     /**
@@ -2292,6 +2376,7 @@ public class SyncService {
      */
     public void result() {
 
+        this.resultDeleteFrist();
         //合并分节点数据
         List<Record> a01RecordList = Db.use("gb_2020_pro").find("select * from \"a01\"");
         Db.use(PG).delete("delete from \"a01_nodeData\"");
@@ -2353,7 +2438,7 @@ public class SyncService {
         Db.use(PG).delete("delete from \"a36\" where \"A0000\" in (select * from \"a01_pro\")");
         Db.use(PG).delete("delete from \"a99z1\" where \"A0000\" in (select * from \"a01_pro\")");
 
-        //还有一种情况他妈的两边都没统计 留中心节点
+        //还有一种情况两边都没统计 留中心节点
         if(CollectionUtil.isNotEmpty(dontNotList)){
             List<Record> recordList = new ArrayList<>();
             for (String s : dontNotList) {
@@ -2438,11 +2523,38 @@ public class SyncService {
         }
         Db.use(PG).batchSave("a99z1",a99z1recordList,1000);
 
+        List<Record> b01List = Db.use("gb_2020_pro").find("select * from \"b01\"");
+        Db.use(PG).delete("delete from \"b01_pro\"");
+        Db.use(PG).batchSave("b01_pro",b01List,1000);
+        Db.use(PG).delete("delete from \"b01\" where \"id\" in (select \"id\" from \"b01_pro\"  )");
+
+
+        List<Record> b01AfterrecordList = Db.use(PG).find("select * from \"b01\"");
+        Db.use(OLAP).delete("delete from \"b01_pro\"");
+        Db.use(OLAP).batchSave("b01_pro",b01AfterrecordList,1000);
+        Db.use(OLAP).delete("delete from \"org_info\" where \"gb_id\" not in (select \"id\" from \"b01_pro\" where \"isDelete\" = 0 )");
+
         List<Record> b01recordList = Db.use("gb_2020_pro").find("select * from \"b01\"");
         Db.use(PG).batchSave("b01",b01recordList,1000);
 
         List<Record> QxOrgShow = Db.use("gb_2020_pro").find("select * from \"QxOrgShow\" where \"type\" = '1'");
         Db.use(PG).batchSave("QxOrgShow",QxOrgShow,1000);
+
+        List<Record> ca01List = Db.use("gb_2020_pro").find("select * from \"c_a01\"  ");
+        Db.use(PG).batchSave("c_a01",ca01List,1000);
+
+        List<Record> ca02List = Db.use("gb_2020_pro").find("select * from \"c_a02\"  ");
+        Db.use(PG).batchSave("c_a02",ca02List,1000);
+
+        List<Record> ca03List = Db.use("gb_2020_pro").find("select * from \"c_a03\"  ");
+        Db.use(PG).batchSave("c_a03",ca03List,1000);
+
+        List<Record> cc01List = Db.use("gb_2020_pro").find("select * from \"c_c01\" ");
+        Db.use(PG).batchSave("c_c01",cc01List,1000);
+
+        List<Record> cc02List = Db.use("gb_2020_pro").find("select * from \"c_c02\"  ");
+        Db.use(PG).batchSave("c_c02",cc02List,1000);
+
 
         List<Record> memInforecordList = Db.use("olap_2021_pro").find("select * from \"mem_info\"");
         for (Record record : memInforecordList) {
@@ -2480,6 +2592,13 @@ public class SyncService {
         }
         Db.use("olap").batchSave("tj_tbsm_item_list",tbsmrecordList,1000);
 
+        //QxOrgShow差最高级别节点
+        Db.use(PG).update("insert into \"QxOrgShow\" select uuid_generate_v4(),\"id\",'1',null,null from \"b01\" where \"B0111\" in (select \"B0111\" from \"changeData\") and \"isDelete\" = 0");
+        //mem_team mem_transfer 的org_id 需要调整
+        Db.use(OLAP).update(" update \"mem_team\" set \"org_id\" = \"org_info\".\"id\" from \"org_info\" where \"mem_team\".\"org_level_code\" = \"org_info\".\"level_code\"");
+        //辞去公职的orgCode
+        Db.use(PG).update("update \"c_a01\" set \"orgCode\" = \"b01\".\"B0111\" from \"b01\" where \"c_a01\".\"unid\" = \"b01\".\"id\"");
+        Db.use(OLAP).update("update \"ext_table\" set \"level_code\" = \"org_info\".\"level_code\" from \"org_info\" where \"org_info\".\"code\" = \"ext_table\".\"code\"");
     }
 
 
@@ -2757,6 +2876,64 @@ public class SyncService {
                     Db.use(PG).batchSave("code_value", codeValueList, 100);
                 }
             }
+        }
+    }
+
+//    public void upload2019Pic() {
+//        List<Record> records = Db.use(PG).find("select * from \"a01\" where \"A0184\" in (select * from \"a01_pro\")");
+//        int index = 1;
+//        for (Record record : records) {
+//            try {
+//                String a0198 = record.getStr("A0198");
+//                File file = new File("/home/gb18092019/webapp" + a0198);
+//                if (ObjectUtil.isNotNull(file) && file.exists()) {
+//                    FileInputStream fileInputStream = new FileInputStream(file);
+//                    FileOutputStream fileOutputStream = new FileOutputStream(new File("/tmp/return/Photos/" + file.getName()));
+//                    IoUtil.copy(fileInputStream, fileOutputStream);
+//                    fileInputStream.close();
+//                    fileOutputStream.close();
+//                }
+//            }catch (Exception e){
+//                e.printStackTrace();
+//            }
+//        }
+//        System.out.println();
+//        System.out.println("照片数据下载完成");
+//        index++;
+//    }
+
+    public void upload2019Pic() {
+        List<Record> changeDataList = Db.use(PG).find("select * from \"changeData\"");
+        List<Record> picRecordList = Db.use(PG).find("select * from \"a01_pro\"");
+        Map<String, String> proMap = picRecordList.stream().collect(Collectors.toMap(var -> var.getStr("A0184"), value -> value.getStr("A0198"), (key1, key2) -> key1));
+        try {
+            for (Record record : changeDataList) {
+                String name = record.getStr("name");
+                List<Record> updateList = new ArrayList<>();
+                List<Record> recordList = Db.use(PG).find("select * from \"c_a01\"");
+                for (Record record1 : recordList) {
+                    if (proMap.containsKey(record1.getStr("a0184"))) {
+                        String a0198 = proMap.get(record1.getStr("a0184"));
+                        Record updateRecord = new Record();
+                        updateRecord.set("id", record1.getStr("id"));
+                        updateRecord.set("a5714", a0198);
+                        updateList.add(updateRecord);
+                        File file = new File("/tmp/upload/Photos/" + a0198.replaceAll("/upload/impFile/Photos/", ""));
+                        FileInputStream fileInputStream = new FileInputStream(file);
+                        FileOutputStream fileOutputStream = new FileOutputStream(new File("/home/" + name + "/gb1809/webapp/upload/impFile/Photos/" + file.getName()));
+                        IoUtil.copy(fileInputStream, fileOutputStream);
+                        fileInputStream.close();
+                        fileOutputStream.close();
+
+                    }
+                }
+
+                if (CollectionUtil.isNotEmpty(updateList)) {
+                    Db.use("gb_" + name).batchUpdate("c_a01", "id", updateList, 100);
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
